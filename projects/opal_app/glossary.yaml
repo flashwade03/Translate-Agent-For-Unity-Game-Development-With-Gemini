@@ -1,0 +1,26 @@
+entries:
+- context: Game progression
+  id: c2bc643e
+  language: ja
+  source: Level Up
+  target: "\u30EC\u30D9\u30EB\u30A2\u30C3\u30D7"
+- context: Game progression
+  id: ab7c81d6
+  language: ko
+  source: Level Up
+  target: "\uB808\uBCA8\uC5C5"
+- context: Points display
+  id: 32b4e1dc
+  language: ja
+  source: Score
+  target: "\u30B9\u30B3\u30A2"
+- context: Points display
+  id: 8ce61f30
+  language: ko
+  source: Score
+  target: "\uC810\uC218"
+- context: Player HP
+  id: c6975036
+  language: ja
+  source: Health Point
+  target: "\u4F53\u529B"

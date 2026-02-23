@@ -1,0 +1,5 @@
+source_language: "en"
+translation_style: "casual"
+character_limit: 30
+glossary_override: false
+instructions: "Keep UI strings short and punchy."
