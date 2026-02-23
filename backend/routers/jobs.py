@@ -1,7 +1,10 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from backend.models import TranslationJob, JobCreatePayload, ReviewReport, JobStatus
 
 router = APIRouter(tags=["jobs"])
+logger = logging.getLogger("agent_job")
 
 
 @router.post("/api/projects/{project_id}/sheets/{sheet_name}/jobs", response_model=TranslationJob, status_code=201)
@@ -39,6 +42,36 @@ async def get_review_report(project_id: str, sheet_name: str, request: Request):
     return report
 
 
+async def _run_agent_turn(runner, session_id, user_id, message):
+    """Run one agent turn and return (response_text, wrote_sheet, event_count)."""
+    from google.genai import types
+
+    content = types.Content(
+        role="user",
+        parts=[types.Part(text=message)],
+    )
+
+    response_text = ""
+    wrote_sheet = False
+    event_count = 0
+
+    async for event in runner.run_async(
+        session_id=session_id,
+        user_id=user_id,
+        new_message=content,
+    ):
+        event_count += 1
+        if getattr(event, "content", None) and event.content.parts:
+            for part in event.content.parts:
+                if hasattr(part, "function_call") and part.function_call:
+                    if part.function_call.name == "write_sheet":
+                        wrote_sheet = True
+                elif hasattr(part, "text") and part.text:
+                    response_text += part.text
+
+    return response_text, wrote_sheet, event_count
+
+
 async def run_agent_job(app, job_id: str):
     """Background task: run ADK agent for a translation/review job."""
     job_svc = app.state.job_service
@@ -63,34 +96,38 @@ async def run_agent_job(app, job_id: str):
 
         # Build the user message based on job type
         if job.type.value == "translate_all":
-            user_msg = f"Translate the {job.sheet_name} sheet for the {job.project_id} project. Translate all keys to all target languages."
+            user_msg = f"Translate the {job.sheet_name} sheet for the {job.project_id} project. Translate all keys to all target languages. You MUST call write_sheet to save results."
         elif job.type.value == "update":
-            user_msg = f"Update translations for the {job.sheet_name} sheet in the {job.project_id} project."
+            user_msg = f"Update translations for the {job.sheet_name} sheet in the {job.project_id} project. You MUST call write_sheet to save results."
         elif job.type.value == "review":
             user_msg = f"Review the translations in the {job.sheet_name} sheet for the {job.project_id} project. Return a JSON report with issues."
         else:
             user_msg = f"Process the {job.sheet_name} sheet for the {job.project_id} project."
 
-        from google.genai import types
-
-        content = types.Content(
-            role="user",
-            parts=[types.Part(text=user_msg)],
-        )
-
+        logger.info("Starting job %s: %s", job_id, user_msg)
         job_svc.update_job(job_id, progress=30)
 
-        # Run agent
-        response_text = ""
-        async for event in runner.run_async(
-            session_id=session.id,
-            user_id=job.project_id,
-            new_message=content,
-        ):
-            if hasattr(event, "content") and event.content and event.content.parts:
-                for part in event.content.parts:
-                    if hasattr(part, "text") and part.text:
-                        response_text += part.text
+        # Turn 1: Agent reads context, generates translations, and writes
+        response_text, wrote_sheet, events = await _run_agent_turn(
+            runner, session.id, job.project_id, user_msg,
+        )
+        logger.info("Job %s turn1: events=%d wrote_sheet=%s", job_id, events, wrote_sheet)
+
+        # Turn 2: If agent didn't call write_sheet, nudge it
+        if not wrote_sheet and job.type.value in ("translate_all", "update"):
+            logger.info("Job %s: write_sheet not called, sending follow-up", job_id)
+            job_svc.update_job(job_id, progress=60)
+
+            followup = (
+                "You have the translations ready. Now call "
+                "write_sheet(project_id, sheet_name, updates) to save them to the CSV file. "
+                "Each update needs 'key', 'lang_code', and 'value'."
+            )
+            response_text2, wrote_sheet2, events2 = await _run_agent_turn(
+                runner, session.id, job.project_id, followup,
+            )
+            logger.info("Job %s turn2: events=%d wrote_sheet=%s", job_id, events2, wrote_sheet2)
+            response_text += response_text2
 
         job_svc.update_job(job_id, status=JobStatus.completed, progress=100, processed_keys=job.total_keys)
 
@@ -114,4 +151,5 @@ async def run_agent_job(app, job_id: str):
                 pass  # Agent response wasn't parseable JSON — ok for v0
 
     except Exception as e:
+        logger.exception("Job %s failed", job_id)
         job_svc.update_job(job_id, status=JobStatus.failed, error=str(e))
