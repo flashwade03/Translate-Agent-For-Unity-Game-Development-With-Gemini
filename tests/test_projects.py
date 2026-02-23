@@ -12,27 +12,26 @@ def test_list_projects_empty(svc):
 
 
 def test_create_project(svc):
-    p = svc.create_project("Test Game", "A test project", "sheet123")
+    p = svc.create_project("Test Game", "A test project")
     assert p.name == "Test Game"
-    assert p.spreadsheet_id == "sheet123"
     assert p.id == "test_game"
 
 
 def test_create_project_creates_yaml(svc, tmp_path):
-    svc.create_project("My Game", "desc", "sid")
+    svc.create_project("My Game", "desc")
     config_path = tmp_path / "my_game" / "config.yaml"
     assert config_path.exists()
 
 
 def test_list_projects_after_create(svc):
-    svc.create_project("Game A", "desc a", "sid_a")
-    svc.create_project("Game B", "desc b", "sid_b")
+    svc.create_project("Game A", "desc a")
+    svc.create_project("Game B", "desc b")
     projects = svc.list_projects()
     assert len(projects) == 2
 
 
 def test_get_project(svc):
-    svc.create_project("Found", "desc", "sid")
+    svc.create_project("Found", "desc")
     p = svc.get_project("found")
     assert p is not None
     assert p.name == "Found"

@@ -1,0 +1,9 @@
+key,English(en),Japanese(ja),Korean(ko)
+btn_start,Start Game,ゲームスタート,게임 시작
+btn_settings,Settings,設定,설정
+btn_quit,Quit,終了,종료
+msg_welcome,"Welcome, {0}!",ようこそ、{0}！,"환영합니다, {0}!"
+msg_level_up,"Level Up! You reached level {0}",レベルアップ！レベル{0}に到達,
+msg_game_over,Game Over,,
+lbl_score,"Score: {0}","スコア: {0}","점수: {0}"
+lbl_time,Time Left,残り時間,남은 시간

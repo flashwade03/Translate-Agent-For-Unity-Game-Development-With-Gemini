@@ -11,7 +11,7 @@ def get_project_config(project_id: str) -> dict:
         project_id: The project identifier (directory name under projects/).
 
     Returns:
-        Dictionary with spreadsheet_id and default_source_language,
+        Dictionary with project configuration (default_source_language, etc.),
         or dict with 'error' key if project not found.
     """
     config_path = PROJECTS_DIR / project_id / "config.yaml"

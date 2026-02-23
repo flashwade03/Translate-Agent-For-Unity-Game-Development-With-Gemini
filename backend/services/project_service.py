@@ -28,7 +28,7 @@ class ProjectService:
             return None
         return self._load_project(project_id, config_path)
 
-    def create_project(self, name: str, description: str, spreadsheet_id: str) -> Project:
+    def create_project(self, name: str, description: str) -> Project:
         project_id = name.lower().replace(" ", "_")
         project_dir = self.projects_dir / project_id
         project_dir.mkdir(parents=True, exist_ok=True)
@@ -38,10 +38,8 @@ class ProjectService:
         config = {
             "name": name,
             "description": description,
-            "spreadsheet_id": spreadsheet_id,
             "default_source_language": "en",
             "created_at": now,
-            "sheet_count": 0,
             "last_translated_at": None,
         }
         with open(project_dir / "config.yaml", "w") as f:
@@ -57,11 +55,16 @@ class ProjectService:
             id=project_id,
             name=name,
             description=description,
-            spreadsheet_id=spreadsheet_id,
             sheet_count=0,
             last_translated_at=None,
             created_at=now,
         )
+
+    def _count_sheets(self, project_id: str) -> int:
+        sheets_dir = self.projects_dir / project_id / "sheets"
+        if not sheets_dir.exists():
+            return 0
+        return len(list(sheets_dir.glob("*.csv")))
 
     def _load_project(self, project_id: str, config_path: Path) -> Project | None:
         with open(config_path) as f:
@@ -70,8 +73,7 @@ class ProjectService:
             id=project_id,
             name=data.get("name", project_id),
             description=data.get("description", ""),
-            spreadsheet_id=data.get("spreadsheet_id", ""),
-            sheet_count=data.get("sheet_count", 0),
+            sheet_count=self._count_sheets(project_id),
             last_translated_at=data.get("last_translated_at"),
             created_at=data.get("created_at", ""),
         )

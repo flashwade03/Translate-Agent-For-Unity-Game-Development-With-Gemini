@@ -13,15 +13,7 @@ async def lifespan(app: FastAPI):
     from backend.services.sheets_service import SheetsService
     from backend.services.job_service import JobService
 
-    # Sheets MCP client
-    sheets_service = SheetsService()
-    try:
-        await sheets_service.connect()
-    except Exception as e:
-        print(f"[WARN] MCP Sheets connection failed: {e}. Sheet endpoints will not work.")
-        sheets_service = SheetsService()  # unconnected fallback
-
-    app.state.sheets_service = sheets_service
+    app.state.sheets_service = SheetsService()
     app.state.job_service = JobService()
 
     # ADK Runner + Session Service
@@ -44,9 +36,6 @@ async def lifespan(app: FastAPI):
         app.state.runner = None
 
     yield
-
-    # --- Shutdown ---
-    await sheets_service.disconnect()
 
 
 app = FastAPI(title="Game Translator API", lifespan=lifespan)

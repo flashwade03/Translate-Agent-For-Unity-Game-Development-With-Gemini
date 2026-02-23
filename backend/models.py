@@ -67,7 +67,6 @@ class Project(_CamelModel):
     id: str
     name: str
     description: str
-    spreadsheet_id: str
     sheet_count: int = 0
     last_translated_at: str | None = None
     created_at: str
@@ -76,7 +75,6 @@ class Project(_CamelModel):
 class CreateProjectPayload(_CamelModel):
     name: str
     description: str
-    spreadsheet_id: str
 
 
 # ---------------------------------------------------------------------------

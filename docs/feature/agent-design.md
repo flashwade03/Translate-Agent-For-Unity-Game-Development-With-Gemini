@@ -2,13 +2,13 @@
 
 ## Goal
 
-Google ADK 기반 멀티 에이전트 시스템으로, Google Spreadsheet의 게임 텍스트를 다국어로 번역/검수한다.
+Google ADK 기반 멀티 에이전트 시스템으로, CSV 파일의 게임 텍스트를 다국어로 번역/검수한다.
 
 ## Tech Stack
 
 - **Agent Framework**: Google ADK — because Gemini 네이티브 지원, 멀티 에이전트 내장
 - **LLM**: Gemini — because ADK 통합, 다국어 번역 품질 충분
-- **Spreadsheet**: Google Sheets API v4 — because 기존 게임 개발 워크플로우가 Google Sheets 기반
+- **Sheet Storage**: 로컬 CSV 파일 (`projects/<name>/sheets/*.csv`) — because 외부 서비스 의존 없이 로컬에서 직접 읽기/쓰기 가능
 - **Config**: YAML — because 사람이 읽고 편집 가능, 별도 DB 불필요
 
 ## Agent Roles
@@ -21,9 +21,9 @@ Sheet 읽기/쓰기는 에이전트가 아닌 **공유 도구**로 처리 — be
 
 ## Tools
 
-- **MCP Google Sheets** (`mcp-google-sheets`): 시트 읽기/쓰기. ADK McpToolset으로 stdio 연결 — because Sheets API 래핑을 직접 구현하지 않고 MCP 생태계 활용.
-- **get_project_config / get_sheet_context**: 프로젝트/시트별 YAML 설정 로드
-- **get_glossary / get_style_guide**: 프로젝트별 YAML에서 로드
+- **CSV 읽기/쓰기 도구**: 프로젝트의 시트 데이터를 읽고 번역 결과를 쓴다.
+- **프로젝트/시트 설정 로드 도구**: 프로젝트 설정과 시트별 컨텍스트 오버라이드를 로드한다.
+- **용어집/스타일가이드 로드 도구**: 프로젝트별 YAML에서 번역 참조 자료를 로드한다.
 
 ## Workflows
 
@@ -38,28 +38,28 @@ sequenceDiagram
     participant U as User
     participant O as Orchestrator
     participant T as Translator
-    participant MCP as MCP Sheets
+    participant CSV as CSV File
     participant Y as YAML Config
 
-    U->>O: "Translate UI sheet for opal_app"
-    O->>Y: get_project_config("opal_app")
-    Y-->>O: spreadsheet_id, default_source_language
-    O->>MCP: get_sheet_data(spreadsheet_id, "UI")
-    MCP-->>O: headers + rows
-    O->>Y: get_sheet_context, get_glossary, get_style_guide
-    Y-->>O: context, glossary, style_guide
+    U->>O: 번역 요청
+    O->>Y: 프로젝트 설정 로드
+    Y-->>O: 기본 소스 언어
+    O->>CSV: 시트 데이터 읽기
+    CSV-->>O: 헤더 + 행 데이터
+    O->>Y: 시트 컨텍스트, 용어집, 스타일가이드 로드
+    Y-->>O: 번역 참조 자료
     loop 각 target language
         O->>T: 번역 요청 (source text + context)
-        T-->>O: translated key-value pairs (JSON)
+        T-->>O: 번역 결과 (key-value)
     end
-    O->>MCP: batch_update_cells(translations)
-    MCP-->>O: success
+    O->>CSV: 번역 결과 쓰기
+    CSV-->>O: 완료
     O-->>U: 완료 리포트
 ```
 
 ## Architectural Decisions
 
-- **MCP로 Sheets 연동** — because Sheets API 래핑을 직접 구현하지 않고, `mcp-google-sheets` 서버를 ADK McpToolset(stdio)으로 연결. 도구 19개를 그대로 사용.
+- **로컬 CSV 파일로 시트 관리** — because 외부 서비스(Google Sheets) 의존을 제거하고, 인증 없이 로컬에서 바로 동작. CSV 파일 구조는 기존 스프레드시트와 동일 (`key, Language(code)` 헤더).
 - **소스 언어 유동적** — because 게임 개발에서 영어 외 언어가 원문일 수 있음 (시트 헤더에서 자동 감지)
 - **전체 언어 자동 번역** — because 타겟 언어를 매번 수동 선택하는 것은 비효율적
 - **프로젝트별 용어집/스타일가이드** — because 게임마다 고유 용어와 톤이 다름. YAML로 프로젝트 디렉토리에 저장.
@@ -68,10 +68,9 @@ sequenceDiagram
 ## Constraints
 
 - Must: 플레이스홀더 ({0}, {1}, {player_name} 등) 원본 그대로 보존
-- Must: Google Sheets API는 batch read/write 사용 (쿼터 관리)
 - Must: 스프레드시트 헤더에서 언어 코드 자동 감지 (예: `Japanese(ja)` → `ja`)
 - Must not: 소스 언어 컬럼을 수정하지 않을 것
-- Must not: 에이전트가 도구 없이 스프레드시트에 직접 접근하지 않을 것
+- Must not: 에이전트가 도구 없이 CSV 파일에 직접 접근하지 않을 것
 
 ## Scope
 
@@ -84,3 +83,4 @@ sequenceDiagram
 - 자동 용어집 추출 (번역 결과에서 반복 패턴 감지)
 - 번역 품질 점수화 (정량적 메트릭)
 - 병렬 번역 (여러 시트 동시 처리)
+- Google Sheets 연동 (MCP 또는 API 직접 사용)

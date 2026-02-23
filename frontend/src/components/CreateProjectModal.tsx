@@ -13,18 +13,16 @@ interface CreateProjectModalProps {
 export function CreateProjectModal({ open, onClose }: CreateProjectModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [spreadsheetId, setSpreadsheetId] = useState('')
   const mutation = useCreateProject()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     mutation.mutate(
-      { name, description, spreadsheetId },
+      { name, description },
       {
         onSuccess: () => {
           setName('')
           setDescription('')
-          setSpreadsheetId('')
           onClose()
         },
       },
@@ -46,13 +44,6 @@ export function CreateProjectModal({ open, onClose }: CreateProjectModalProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Brief description of the project"
-        />
-        <Input
-          label="Spreadsheet ID"
-          value={spreadsheetId}
-          onChange={(e) => setSpreadsheetId(e.target.value)}
-          placeholder="Google Spreadsheet ID"
-          required
         />
         <div className="flex justify-end gap-2 mt-2">
           <Button variant="outline" type="button" onClick={onClose}>

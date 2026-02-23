@@ -1,78 +1,38 @@
-import json
-import os
+import csv
 import re
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from pathlib import Path
+
 from backend.models import SheetData, Language
+
+PROJECTS_DIR = Path(__file__).parent.parent.parent / "projects"
 
 
 class SheetsService:
-    def __init__(self):
-        self._session: ClientSession | None = None
-        self._stdio_context = None
-        self._session_context = None
-        self.service_account_path = os.environ.get(
-            "SERVICE_ACCOUNT_PATH",
-            os.path.join(os.path.dirname(__file__), "..", "..", "config", "service-account.json"),
-        )
+    def __init__(self, projects_dir: Path = PROJECTS_DIR):
+        self.projects_dir = projects_dir
 
-    async def connect(self):
-        """Start MCP server and create client session."""
-        server_params = StdioServerParameters(
-            command="uvx",
-            args=["mcp-google-sheets"],
-            env={**os.environ, "SERVICE_ACCOUNT_PATH": self.service_account_path},
-        )
-        self._stdio_context = stdio_client(server_params)
-        read, write = await self._stdio_context.__aenter__()
-        self._session_context = ClientSession(read, write)
-        self._session = await self._session_context.__aenter__()
-        await self._session.initialize()
+    def list_sheets(self, project_id: str) -> list[str]:
+        """List CSV files in projects/<id>/sheets/."""
+        sheets_dir = self.projects_dir / project_id / "sheets"
+        if not sheets_dir.exists():
+            return []
+        return sorted(f.stem for f in sheets_dir.glob("*.csv"))
 
-    async def disconnect(self):
-        """Close MCP session."""
-        if self._session_context:
-            try:
-                await self._session_context.__aexit__(None, None, None)
-            except Exception:
-                pass
-        if self._stdio_context:
-            try:
-                await self._stdio_context.__aexit__(None, None, None)
-            except Exception:
-                pass
-        self._session = None
-
-    async def _call_tool(self, name: str, arguments: dict) -> dict:
-        if not self._session:
-            raise RuntimeError("SheetsService not connected")
-        result = await self._session.call_tool(name, arguments)
-        # MCP tool results come as content list; extract text
-        if result.content and len(result.content) > 0:
-            text = result.content[0].text
-            try:
-                return json.loads(text)
-            except (json.JSONDecodeError, AttributeError):
-                return {"raw": text}
-        return {}
-
-    async def list_sheets(self, spreadsheet_id: str) -> list[str]:
-        result = await self._call_tool("list_sheets", {"spreadsheet_id": spreadsheet_id})
-        return result.get("sheets", [])
-
-    async def get_sheet_data(self, spreadsheet_id: str, sheet_name: str) -> SheetData | None:
-        result = await self._call_tool("read_sheet", {
-            "spreadsheet_id": spreadsheet_id,
-            "sheet_name": sheet_name,
-        })
-        if not result or "raw" in result:
+    def get_sheet_data(self, project_id: str, sheet_name: str) -> SheetData | None:
+        """Read a CSV file and return structured SheetData."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
             return None
 
-        headers = result.get("headers", [])
-        raw_rows = result.get("rows", [])
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return None
+            raw_rows = list(reader)
 
         # Parse language headers: "English(en)" -> Language(code="en", label="English")
-        languages = []
+        languages: list[Language] = []
         for h in headers[1:]:  # skip 'key' column
             m = re.match(r"(.+)\((\w+)\)", h)
             if m:
@@ -83,9 +43,9 @@ class SheetsService:
             languages[0].is_source = True
 
         # Convert rows to dicts
-        rows = []
+        rows: list[dict[str, str]] = []
         for raw_row in raw_rows:
-            row = {"key": raw_row[0] if raw_row else ""}
+            row: dict[str, str] = {"key": raw_row[0] if raw_row else ""}
             for i, lang in enumerate(languages):
                 row[lang.code] = raw_row[i + 1] if i + 1 < len(raw_row) else ""
             rows.append(row)
@@ -97,10 +57,52 @@ class SheetsService:
             rows=rows,
         )
 
-    async def update_cells(self, spreadsheet_id: str, sheet_name: str, updates: list[dict]) -> bool:
-        await self._call_tool("batch_update_cells", {
-            "spreadsheet_id": spreadsheet_id,
-            "sheet_name": sheet_name,
-            "updates": updates,
-        })
+    def update_cells(self, project_id: str, sheet_name: str, updates: list[dict]) -> bool:
+        """Update specific cells in a CSV file.
+
+        Each update dict has: key, lang_code, value.
+        """
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return False
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return False
+            raw_rows = list(reader)
+
+        # Build column index: lang_code -> column index
+        col_index: dict[str, int] = {}
+        for i, h in enumerate(headers[1:], start=1):
+            m = re.match(r".+\((\w+)\)", h)
+            if m:
+                col_index[m.group(1)] = i
+
+        # Build key -> row index
+        key_index: dict[str, int] = {}
+        for i, row in enumerate(raw_rows):
+            if row:
+                key_index[row[0]] = i
+
+        # Apply updates
+        for u in updates:
+            key = u.get("key", "")
+            lang_code = u.get("lang_code", "")
+            value = u.get("value", "")
+            row_idx = key_index.get(key)
+            col_idx = col_index.get(lang_code)
+            if row_idx is not None and col_idx is not None:
+                # Extend row if needed
+                while len(raw_rows[row_idx]) <= col_idx:
+                    raw_rows[row_idx].append("")
+                raw_rows[row_idx][col_idx] = value
+
+        # Write back
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(raw_rows)
+
         return True

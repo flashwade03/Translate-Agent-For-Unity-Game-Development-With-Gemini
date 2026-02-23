@@ -60,7 +60,8 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
     const payload = body as CreateProjectPayload
     const newProject = {
       id: payload.name.toLowerCase().replace(/\s+/g, '_'),
-      ...payload,
+      name: payload.name,
+      description: payload.description,
       sheetCount: 0,
       lastTranslatedAt: null,
       createdAt: new Date().toISOString(),

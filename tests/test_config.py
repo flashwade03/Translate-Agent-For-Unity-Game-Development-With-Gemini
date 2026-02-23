@@ -4,7 +4,6 @@ from game_translator.tools.config import get_project_config, get_sheet_context
 def test_get_project_config_returns_dict():
     result = get_project_config(project_id="opal_app")
     assert isinstance(result, dict)
-    assert "spreadsheet_id" in result
     assert "default_source_language" in result
 
 

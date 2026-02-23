@@ -1,0 +1,3 @@
+key,English(en),Japanese(ja),Korean(ko)
+npc_01_greeting,"Hello, adventurer!",こんにちは、冒険者！,"안녕, 모험가!"
+npc_01_quest,"Can you help me find {0}?",{0}を探すのを手伝ってくれる？,
