@@ -82,3 +82,4 @@ sequenceDiagram
 - 동시 작업 제한 / 큐 관리
 - CSV 파일 업로드 API
 - Google Sheets 연동 (선택적)
+- 번역 언어 추가/삭제 관리 (CSV 컬럼 동적 관리)
