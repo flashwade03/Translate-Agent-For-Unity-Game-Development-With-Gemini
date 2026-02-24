@@ -2,6 +2,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from backend.models import TranslationJob, JobCreatePayload, ReviewReport, JobStatus
+from backend.routers.ws import broadcast_job_update
 
 router = APIRouter(tags=["jobs"])
 logger = logging.getLogger("agent_job")
@@ -88,6 +89,14 @@ async def run_agent_job(app, job_id: str):
         return
 
     job_svc.update_job(job_id, status=JobStatus.running, progress=10)
+    await broadcast_job_update(job_id, {
+        "jobId": job_id,
+        "status": JobStatus.running.value,
+        "progress": 10,
+        "processedKeys": 0,
+        "totalKeys": job.total_keys,
+        "error": None,
+    })
 
     try:
         runner = app.state.runner
@@ -114,6 +123,14 @@ async def run_agent_job(app, job_id: str):
 
         logger.info("Starting job %s: %s", job_id, user_msg)
         job_svc.update_job(job_id, progress=30)
+        await broadcast_job_update(job_id, {
+            "jobId": job_id,
+            "status": JobStatus.running.value,
+            "progress": 30,
+            "processedKeys": 0,
+            "totalKeys": job.total_keys,
+            "error": None,
+        })
 
         # Turn 1: Agent reads context, generates translations, and writes
         response_text, wrote_sheet, events = await _run_agent_turn(
@@ -125,6 +142,14 @@ async def run_agent_job(app, job_id: str):
         if not wrote_sheet and job.type.value in ("translate_all", "update"):
             logger.info("Job %s: write_sheet not called, sending follow-up", job_id)
             job_svc.update_job(job_id, progress=60)
+            await broadcast_job_update(job_id, {
+                "jobId": job_id,
+                "status": JobStatus.running.value,
+                "progress": 60,
+                "processedKeys": 0,
+                "totalKeys": job.total_keys,
+                "error": None,
+            })
 
             followup = (
                 "You have the translations ready. Now call "
@@ -138,6 +163,21 @@ async def run_agent_job(app, job_id: str):
             response_text += response_text2
 
         job_svc.update_job(job_id, status=JobStatus.completed, progress=100, processed_keys=job.total_keys)
+        await broadcast_job_update(job_id, {
+            "jobId": job_id,
+            "status": JobStatus.completed.value,
+            "progress": 100,
+            "processedKeys": job.total_keys,
+            "totalKeys": job.total_keys,
+            "error": None,
+        })
+
+        # Persist to job history
+        history_svc = app.state.job_history_service
+        if history_svc:
+            job = job_svc.get_job(job_id)
+            if job:
+                await history_svc.save_job(job)
 
         # If review job, try to parse and store the report
         if job.type.value == "review" and response_text:
@@ -178,3 +218,19 @@ async def run_agent_job(app, job_id: str):
     except Exception as e:
         logger.exception("Job %s failed", job_id)
         job_svc.update_job(job_id, status=JobStatus.failed, error=str(e))
+        job = job_svc.get_job(job_id)
+        await broadcast_job_update(job_id, {
+            "jobId": job_id,
+            "status": JobStatus.failed.value,
+            "progress": job.progress if job else 0,
+            "processedKeys": job.processed_keys if job else 0,
+            "totalKeys": job.total_keys if job else 0,
+            "error": str(e),
+        })
+
+        # Persist to job history
+        history_svc = app.state.job_history_service
+        if history_svc:
+            job = job_svc.get_job(job_id)
+            if job:
+                await history_svc.save_job(job)

@@ -1,11 +1,15 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useSheetData } from '../hooks/useSheets'
 import { useTranslation } from '../hooks/useTranslation'
+import { useLanguages } from '../hooks/useLanguages'
 import { updateSheetRows } from '../api/sheets'
 import { PageHeader } from '../components/layout/PageHeader'
 import { DataTable } from '../components/DataTable'
 import { JobStatusBanner } from '../components/JobStatusBanner'
+import { AddLanguageModal } from '../components/AddLanguageModal'
+import { DeleteLanguageDialog } from '../components/DeleteLanguageDialog'
 import { Button } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
 
@@ -14,6 +18,11 @@ export default function SheetViewer() {
   const navigate = useNavigate()
   const { data, isLoading, error } = useSheetData(projectId!, sheetName!)
   const { job, isRunning, trigger, dismiss } = useTranslation(projectId!, sheetName!)
+  const { addMutation, deleteMutation } = useLanguages(projectId!, sheetName!)
+
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ code: string; label: string } | null>(null)
+  const [deleteTranslationCount, setDeleteTranslationCount] = useState(0)
 
   const saveMutation = useMutation({
     mutationFn: (updates: { key: string; langCode: string; value: string }[]) =>
@@ -22,6 +31,39 @@ export default function SheetViewer() {
 
   const handleCellSave = (key: string, langCode: string, value: string) => {
     saveMutation.mutate([{ key, langCode, value }])
+  }
+
+  const handleAddLanguage = (code: string, label: string, translateNow: boolean) => {
+    addMutation.mutate(
+      { code, label },
+      {
+        onSuccess: () => {
+          setAddModalOpen(false)
+          if (translateNow) {
+            trigger('translate_all')
+          }
+        },
+      },
+    )
+  }
+
+  const handleDeleteLanguage = (code: string) => {
+    const lang = data?.languages.find((l) => l.code === code)
+    if (lang) {
+      const translationCount = data?.rows.filter((row) => row[code]).length ?? 0
+      setDeleteTarget({ code, label: lang.label })
+      setDeleteTranslationCount(translationCount)
+    }
+  }
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.code, {
+        onSuccess: () => {
+          setDeleteTarget(null)
+        },
+      })
+    }
   }
 
   if (isLoading) {
@@ -81,7 +123,29 @@ export default function SheetViewer() {
 
       {job && <JobStatusBanner job={job} onDismiss={dismiss} />}
 
-      <DataTable data={data} disabled={isRunning} onCellSave={handleCellSave} />
+      <DataTable
+        data={data}
+        disabled={isRunning}
+        onCellSave={handleCellSave}
+        onDeleteLanguage={handleDeleteLanguage}
+        onAddLanguage={() => setAddModalOpen(true)}
+      />
+
+      <AddLanguageModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onConfirm={handleAddLanguage}
+      />
+
+      {deleteTarget && (
+        <DeleteLanguageDialog
+          open={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+          languageLabel={deleteTarget.label}
+          translationCount={deleteTranslationCount}
+        />
+      )}
     </div>
   )
 }

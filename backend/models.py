@@ -118,6 +118,19 @@ class TranslationJob(_CamelModel):
     created_at: str
 
 
+class JobHistoryEntry(_CamelModel):
+    job_id: str
+    project_id: str
+    sheet_name: str
+    type: JobType
+    status: JobStatus
+    total_keys: int = 0
+    processed_keys: int = 0
+    error: str | None = None
+    created_at: str
+    completed_at: str | None = None
+
+
 class JobCreatePayload(_CamelModel):
     type: JobType
 
@@ -211,3 +224,8 @@ class RowUpdate(_CamelModel):
     key: str
     lang_code: str
     value: str
+
+
+class AddLanguagePayload(_CamelModel):
+    code: str
+    label: str

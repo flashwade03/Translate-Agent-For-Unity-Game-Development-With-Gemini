@@ -6,6 +6,7 @@ import type {
   StyleGuide,
   ReviewReport,
   TranslationJob,
+  JobHistoryEntry,
 } from '../../types'
 
 export const mockProjects: Project[] = [
@@ -176,6 +177,57 @@ export const mockReviewReport: Record<string, ReviewReport> = {
     ],
     createdAt: '2026-02-21T15:00:00Z',
   },
+}
+
+export const mockJobHistory: Record<string, JobHistoryEntry[]> = {
+  opal_app: [
+    {
+      jobId: 'hist_1',
+      projectId: 'opal_app',
+      sheetName: 'UI',
+      type: 'translate_all',
+      status: 'completed',
+      totalKeys: 8,
+      processedKeys: 8,
+      createdAt: '2026-02-20T10:30:00Z',
+      completedAt: '2026-02-20T10:32:15Z',
+    },
+    {
+      jobId: 'hist_2',
+      projectId: 'opal_app',
+      sheetName: 'Dialogues',
+      type: 'translate_all',
+      status: 'completed',
+      totalKeys: 2,
+      processedKeys: 2,
+      createdAt: '2026-02-20T10:35:00Z',
+      completedAt: '2026-02-20T10:35:45Z',
+    },
+    {
+      jobId: 'hist_3',
+      projectId: 'opal_app',
+      sheetName: 'UI',
+      type: 'review',
+      status: 'completed',
+      totalKeys: 8,
+      processedKeys: 8,
+      createdAt: '2026-02-21T15:00:00Z',
+      completedAt: '2026-02-21T15:02:30Z',
+    },
+    {
+      jobId: 'hist_4',
+      projectId: 'opal_app',
+      sheetName: 'Items',
+      type: 'translate_all',
+      status: 'failed',
+      totalKeys: 2,
+      processedKeys: 1,
+      error: 'API rate limit exceeded',
+      createdAt: '2026-02-22T09:00:00Z',
+      completedAt: '2026-02-22T09:01:10Z',
+    },
+  ],
+  ruby_rpg: [],
 }
 
 // Job simulation state

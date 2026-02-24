@@ -6,6 +6,7 @@ import {
   mockGlossary,
   mockStyleGuide,
   mockReviewReport,
+  mockJobHistory,
   createMockJob,
   pollMockJob,
 } from './data'
@@ -186,6 +187,51 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
   if (params && method === 'GET') {
     const key = `${params.projectId}/${params.sheetName}`
     return mockReviewReport[key] || null
+  }
+
+  // Job History
+  params = match('/api/projects/:projectId/jobs', path)
+  if (params && method === 'GET') {
+    return mockJobHistory[params.projectId] || []
+  }
+
+  // Language Management
+  params = match('/api/projects/:projectId/sheets/:sheetName/languages', path)
+  if (params && method === 'POST') {
+    const { code, label } = body as { code: string; label: string }
+    const sheetKey = `${params.projectId}/${params.sheetName}`
+    const data = mockSheetData[sheetKey]
+    if (data) {
+      const header = `${label}(${code})`
+      if (!data.headers.includes(header)) {
+        data.headers.push(header)
+        data.languages.push({ code, label, isSource: false })
+        for (const row of data.rows) {
+          row[code] = ''
+        }
+      }
+    }
+    return { ok: true, code, label }
+  }
+
+  params = match('/api/projects/:projectId/sheets/:sheetName/languages/:code', path)
+  if (params && method === 'DELETE') {
+    const sheetKey = `${params.projectId}/${params.sheetName}`
+    const data = mockSheetData[sheetKey]
+    let deletedTranslations = 0
+    if (data) {
+      const langIdx = data.languages.findIndex((l) => l.code === params!.code)
+      if (langIdx >= 0) {
+        data.languages.splice(langIdx, 1)
+        const headerIdx = data.headers.findIndex((h) => h.includes(`(${params!.code})`))
+        if (headerIdx >= 0) data.headers.splice(headerIdx, 1)
+        for (const row of data.rows) {
+          if (row[params!.code]) deletedTranslations++
+          delete row[params!.code]
+        }
+      }
+    }
+    return { ok: true, deletedTranslations }
   }
 
   console.warn(`[Mock] Unhandled: ${method} ${path}`)

@@ -47,6 +47,9 @@ export function Sidebar() {
         <NavLink to={`/projects/${projectId}/reports`} className={linkClass}>
           Review Reports
         </NavLink>
+        <NavLink to={`/projects/${projectId}/job-history`} className={linkClass}>
+          Job History
+        </NavLink>
       </nav>
     </aside>
   )

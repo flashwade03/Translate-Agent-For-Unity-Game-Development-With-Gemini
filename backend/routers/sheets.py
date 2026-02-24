@@ -39,3 +39,34 @@ async def update_rows(project_id: str, sheet_name: str, updates: list[RowUpdate]
         [u.model_dump() for u in updates],
     )
     return {"ok": True}
+
+
+from backend.models import AddLanguagePayload
+
+
+@router.post("/sheets/{sheet_name}/languages", status_code=201)
+async def add_language(
+    project_id: str,
+    sheet_name: str,
+    payload: AddLanguagePayload,
+    request: Request,
+):
+    sheets_svc = request.app.state.sheets_service
+    ok = sheets_svc.add_language(project_id, sheet_name, payload.code, payload.label)
+    if not ok:
+        raise HTTPException(400, "Failed to add language. It may already exist.")
+    return {"ok": True, "code": payload.code, "label": payload.label}
+
+
+@router.delete("/sheets/{sheet_name}/languages/{code}")
+async def delete_language(
+    project_id: str,
+    sheet_name: str,
+    code: str,
+    request: Request,
+):
+    sheets_svc = request.app.state.sheets_service
+    deleted_count = sheets_svc.delete_language(project_id, sheet_name, code)
+    if deleted_count < 0:
+        raise HTTPException(404, "Language not found in this sheet.")
+    return {"ok": True, "deletedTranslations": deleted_count}

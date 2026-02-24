@@ -10,6 +10,7 @@ const SheetSettings = lazy(() => import('./pages/SheetSettings'))
 const GlossaryEditor = lazy(() => import('./pages/GlossaryEditor'))
 const StyleGuideEditor = lazy(() => import('./pages/StyleGuideEditor'))
 const ReviewReport = lazy(() => import('./pages/ReviewReport'))
+const JobHistory = lazy(() => import('./pages/JobHistory'))
 
 function Loading() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="glossary" element={<GlossaryEditor />} />
           <Route path="style-guide" element={<StyleGuideEditor />} />
           <Route path="reports" element={<ReviewReport />} />
+          <Route path="job-history" element={<JobHistory />} />
         </Route>
       </Routes>
     </Suspense>

@@ -13,3 +13,16 @@ export interface TranslationJob {
   error?: string
   createdAt: string
 }
+
+export interface JobHistoryEntry {
+  jobId: string
+  projectId: string
+  sheetName: string
+  type: JobType
+  status: JobStatus
+  totalKeys: number
+  processedKeys: number
+  error?: string
+  createdAt: string
+  completedAt?: string
+}

@@ -106,3 +106,69 @@ class SheetsService:
             writer.writerows(raw_rows)
 
         return True
+
+    def add_language(self, project_id: str, sheet_name: str, code: str, label: str) -> bool:
+        """Add a new language column to a CSV file. Returns True on success."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return False
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return False
+            rows = list(reader)
+
+        header_str = f"{label}({code})"
+        if header_str in headers:
+            return False  # Language already exists
+
+        headers.append(header_str)
+        for row in rows:
+            row.append("")  # Empty cell for new language
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(rows)
+
+        return True
+
+    def delete_language(self, project_id: str, sheet_name: str, code: str) -> int:
+        """Delete a language column from CSV. Returns count of deleted non-empty translations, or -1 on error."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return -1
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return -1
+            rows = list(reader)
+
+        # Find column index for this language code
+        col_idx = None
+        for i, h in enumerate(headers[1:], start=1):
+            m = re.match(r".+\((\w+)\)", h)
+            if m and m.group(1) == code:
+                col_idx = i
+                break
+
+        if col_idx is None:
+            return -1
+
+        # Count non-empty translations that will be deleted
+        deleted_count = sum(1 for row in rows if col_idx < len(row) and row[col_idx])
+
+        # Remove column
+        new_headers = headers[:col_idx] + headers[col_idx + 1:]
+        new_rows = [row[:col_idx] + row[col_idx + 1:] for row in rows]
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(new_headers)
+            writer.writerows(new_rows)
+
+        return deleted_count

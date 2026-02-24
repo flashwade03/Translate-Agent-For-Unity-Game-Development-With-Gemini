@@ -16,6 +16,11 @@ async def lifespan(app: FastAPI):
     app.state.sheets_service = SheetsService()
     app.state.job_service = JobService()
 
+    from backend.services.job_history_service import JobHistoryService
+    job_history_service = JobHistoryService()
+    await job_history_service.init_db()
+    app.state.job_history_service = job_history_service
+
     # ADK Runner + Session Service
     try:
         from google.adk.runners import Runner
@@ -48,12 +53,14 @@ app.add_middleware(
 )
 
 # Routers
-from backend.routers import projects, config, sheets, jobs  # noqa: E402
+from backend.routers import projects, config, sheets, jobs, job_history, ws  # noqa: E402
 
 app.include_router(projects.router)
 app.include_router(config.router)
 app.include_router(sheets.router)
 app.include_router(jobs.router)
+app.include_router(job_history.router)
+app.include_router(ws.router)
 
 
 @app.get("/api/health")

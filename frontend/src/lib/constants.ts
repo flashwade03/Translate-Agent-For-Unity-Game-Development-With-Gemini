@@ -11,4 +11,5 @@ export const QUERY_KEYS = {
   job: (jobId: string) => ['job', jobId] as const,
   review: (projectId: string, sheetName: string) =>
     ['review', projectId, sheetName] as const,
+  jobHistory: (projectId: string) => ['jobHistory', projectId] as const,
 } as const
