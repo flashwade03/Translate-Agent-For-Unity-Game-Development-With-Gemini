@@ -172,3 +172,94 @@ class SheetsService:
             writer.writerows(new_rows)
 
         return deleted_count
+
+    def add_row(self, project_id: str, sheet_name: str, key: str) -> bool:
+        """Add a new row with the given key and empty values. Returns False if key already exists."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return False
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return False
+            rows = list(reader)
+
+        # Check for duplicate key
+        if any(row[0] == key for row in rows if row):
+            return False
+
+        # Add new row: key + empty strings for each language column
+        new_row = [key] + [""] * (len(headers) - 1)
+        rows.append(new_row)
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(rows)
+
+        return True
+
+    def delete_rows(self, project_id: str, sheet_name: str, keys: list[str]) -> int:
+        """Delete rows by key names. Returns count of actually deleted rows."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return 0
+
+        keys_set = set(keys)
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if not headers:
+                return 0
+            rows = list(reader)
+
+        original_count = len(rows)
+        rows = [r for r in rows if not r or r[0] not in keys_set]
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            writer.writerows(rows)
+
+        return original_count - len(rows)
+
+    def create_sheet(self, project_id: str, sheet_name: str) -> bool:
+        """Create a new empty CSV sheet. Copies language headers from an existing sheet if any."""
+        sheets_dir = self.projects_dir / project_id / "sheets"
+        sheets_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = sheets_dir / f"{sheet_name}.csv"
+        if csv_path.exists():
+            return False
+
+        # Copy headers from first existing sheet, or default to just 'key'
+        headers = ["key"]
+        existing = sorted(sheets_dir.glob("*.csv"))
+        if existing:
+            with open(existing[0], newline="", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                first_row = next(reader, None)
+                if first_row:
+                    headers = first_row
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+
+        return True
+
+    def delete_sheet(self, project_id: str, sheet_name: str) -> int:
+        """Delete a CSV sheet. Returns the number of rows (keys) that were deleted, or -1 if not found."""
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            return -1
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            next(reader, None)  # skip headers
+            key_count = sum(1 for _ in reader)
+
+        csv_path.unlink()
+        return key_count
