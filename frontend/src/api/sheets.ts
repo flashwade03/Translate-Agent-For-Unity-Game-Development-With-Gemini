@@ -44,3 +44,34 @@ export function deleteLanguage(
     `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/languages/${encodeURIComponent(code)}`,
   )
 }
+
+export function addSheetRow(projectId: string, sheetName: string, key: string) {
+  return api<{ ok: boolean; key: string }>(
+    'POST',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/rows`,
+    { key },
+  )
+}
+
+export function createSheet(projectId: string, name: string) {
+  return api<{ ok: boolean; name: string }>(
+    'POST',
+    `/api/projects/${projectId}/sheets`,
+    { name },
+  )
+}
+
+export function deleteSheet(projectId: string, sheetName: string) {
+  return api<{ ok: boolean; deletedKeys: number }>(
+    'DELETE',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}`,
+  )
+}
+
+export function deleteRows(projectId: string, sheetName: string, keys: string[]) {
+  return api<{ ok: boolean; deletedCount: number }>(
+    'DELETE',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/rows`,
+    { keys },
+  )
+}

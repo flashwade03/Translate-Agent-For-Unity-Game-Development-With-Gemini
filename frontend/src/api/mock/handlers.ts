@@ -76,14 +76,58 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
   if (params && method === 'GET') {
     return mockSheetNames[params.projectId] || []
   }
+  if (params && method === 'POST') {
+    const { name } = body as { name: string }
+    const names = mockSheetNames[params.projectId] || []
+    if (names.includes(name)) {
+      throw new Error('Sheet already exists')
+    }
+    names.push(name)
+    mockSheetNames[params.projectId] = names
+    // Copy headers from first existing sheet or default
+    const firstKey = Object.keys(mockSheetData).find((k) => k.startsWith(`${params!.projectId}/`))
+    const firstSheet = firstKey ? mockSheetData[firstKey] : null
+    mockSheetData[`${params.projectId}/${name}`] = {
+      sheetName: name,
+      headers: firstSheet ? [...firstSheet.headers] : ['key'],
+      languages: firstSheet ? firstSheet.languages.map((l) => ({ ...l })) : [],
+      rows: [],
+    }
+    return { ok: true, name }
+  }
 
   params = match('/api/projects/:projectId/sheets/:sheetName', path)
+  if (params && method === 'DELETE') {
+    const names = mockSheetNames[params.projectId] || []
+    const key = `${params.projectId}/${params.sheetName}`
+    const data = mockSheetData[key]
+    const deletedKeys = data ? data.rows.length : 0
+    mockSheetNames[params.projectId] = names.filter((n) => n !== params!.sheetName)
+    delete mockSheetData[key]
+    return { ok: true, deletedKeys }
+  }
   if (params && method === 'GET') {
     const key = `${params.projectId}/${params.sheetName}`
     return mockSheetData[key] || null
   }
 
   params = match('/api/projects/:projectId/sheets/:sheetName/rows', path)
+  if (params && method === 'POST') {
+    const { key } = body as { key: string }
+    const sheetKey = `${params.projectId}/${params.sheetName}`
+    const data = mockSheetData[sheetKey]
+    if (data) {
+      if (data.rows.some((r) => r.key === key)) {
+        throw new Error('Key already exists')
+      }
+      const newRow = { key } as Record<string, string> & { key: string }
+      for (const lang of data.languages) {
+        newRow[lang.code] = ''
+      }
+      data.rows.push(newRow)
+    }
+    return { ok: true, key }
+  }
   if (params && method === 'PUT') {
     const key = `${params.projectId}/${params.sheetName}`
     const data = mockSheetData[key]
@@ -97,6 +141,19 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
     return { ok: true }
   }
 
+  if (params && method === 'DELETE') {
+    const { keys } = body as { keys: string[] }
+    const sheetKey = `${params.projectId}/${params.sheetName}`
+    const data = mockSheetData[sheetKey]
+    let deletedCount = 0
+    if (data) {
+      const keysSet = new Set(keys)
+      const before = data.rows.length
+      data.rows = data.rows.filter((r) => !keysSet.has(r.key))
+      deletedCount = before - data.rows.length
+    }
+    return { ok: true, deletedCount }
+  }
   // Sheet Settings
   params = match('/api/projects/:projectId/sheets/:sheetName/settings', path)
   if (params) {
