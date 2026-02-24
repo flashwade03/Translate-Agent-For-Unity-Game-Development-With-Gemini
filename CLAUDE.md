@@ -65,5 +65,5 @@ adk run game_translator
 | 문서 | 참조 시점 |
 |------|----------|
 | `docs/feature/agent-design.md` | 에이전트 구조, CSV 도구, 번역 워크플로우, 제약 조건 확인 시 |
-| `docs/feature/backend-design.md` | API 설계, CSV 시트 관리, 비동기 job 모델, Runner/SessionService, 데이터 흐름 확인 시 |
-| `docs/feature/frontend-design.md` | 화면 구성, 레이아웃, UX 결정 확인 시 |
+| `docs/feature/backend-design.md` | API 설계, CSV 시트 관리, 비동기 job 모델, Runner/SessionService, 데이터 흐름 확인 시. v1: WebSocket 진행률, Job SQLite 영속화, 언어 관리 API |
+| `docs/feature/frontend-design.md` | 화면 구성, 레이아웃, UX 결정 확인 시. v1: WebSocket 수신, Job History 화면, 언어 추가/삭제 UI |

@@ -74,12 +74,65 @@ sequenceDiagram
 **In scope (v0)**: 프로젝트 CRUD, CSV 시트 조회/수정, 번역 job 실행/상태, 설정 관리
 **Out of scope**: 인증, 멀티 유저, 작업 이력 저장
 
-## v0 이후 검토 방향 (확정 아님 — v0 사용 경험 후 결정)
+---
+
+## v1 Additions
+
+### Goal
+
+v0의 폴링 기반 진행률을 WebSocket으로 전환하고, Job 이력을 영속 저장하며, 번역 언어를 동적으로 관리한다.
+
+### Architectural Decisions (v1)
+
+- **WebSocket으로 Job 진행률 전송** — because v0 폴링(1.5초)은 불필요한 요청을 반복하고 응답이 지연됨. 서버가 상태 변경 시 즉시 push.
+- **Job 실행 중에만 WebSocket 연결** — because 항상 연결을 유지할 필요가 없음. 프론트엔드가 job 트리거 시 연결, 완료/실패 시 종료.
+- **단계 기반 진행률 유지** — because v0에서 충분히 작동함. 전송 방식만 폴링→WebSocket으로 변경, 진행률 계산 로직은 동일.
+- **Job 이력 SQLite 영속화** — because v0에서 서버 재시작 시 이력 소멸이 불편. 기존 aiosqlite 인프라 활용.
+- **Job 이력 범위: 메타데이터만** — because 에이전트 응답 전체를 저장할 필요는 아직 없음. job ID, 타입, 상태, 시각, 에러만 저장.
+- **CSV 컬럼 동적 추가/삭제로 번역 언어 관리** — because 언어 목록이 CSV 헤더에 내재되어 있으므로, 컬럼 추가/삭제가 자연스러운 접근.
+
+### API Groups (v1 추가)
+
+- **Languages**: 시트별 번역 언어 추가/삭제 (CSV 헤더 컬럼 관리)
+- **Job History**: 프로젝트별 과거 Job 이력 조회
+- **WebSocket**: Job 진행률 실시간 전송
+
+### Flows (v1)
+
+#### WebSocket 진행률 흐름
+
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant API as FastAPI
+    participant R as ADK Runner
+
+    FE->>API: 번역 요청 (REST)
+    API-->>FE: job ID + pending
+    FE->>API: WebSocket 연결 (job ID)
+    API->>R: background task 실행
+    loop 단계별 진행
+        R-->>API: 상태 변경
+        API-->>FE: WebSocket push (상태, 진행률)
+    end
+    API-->>FE: completed/failed
+    FE->>FE: WebSocket 종료
+```
+
+### Constraints (v1 추가)
+
+- Must: WebSocket 연결은 job 완료/실패 시 서버 측에서 종료 메시지 전송
+- Must: 언어 삭제 시 해당 컬럼의 기존 데이터가 영구 삭제됨을 API 응답에 명시
+- Must not: WebSocket을 job 진행률 외 용도로 사용하지 않을 것 (v1 범위)
+
+### Scope (v1)
+
+**In scope**: WebSocket 진행률, Job SQLite 영속화 + 이력 조회 API, 번역 언어 추가/삭제 API
+**Out of scope**: 인증, 멀티 유저, 동시 작업 제한, CSV 업로드
+
+## v1 이후 검토 방향 (확정 아님 — v1 사용 경험 후 결정)
 
 - 사용자 인증 (Google OAuth)
-- 작업 이력 / 로그 저장 (Job 관리를 SQLite로 마이그레이션)
-- WebSocket으로 실시간 진행률 전송
 - 동시 작업 제한 / 큐 관리
 - CSV 파일 업로드 API
 - Google Sheets 연동 (선택적)
-- 번역 언어 추가/삭제 관리 (CSV 컬럼 동적 관리)
