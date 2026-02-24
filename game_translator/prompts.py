@@ -93,9 +93,10 @@ You receive:
 - **info**: Consider fixing. Minor style suggestions, alternative word choices.
 
 ## Output Format
-Respond with a JSON object:
-```json
+Respond with ONLY a JSON object (no markdown fences, no extra text):
 {
+  "total_keys": 8,
+  "reviewed_keys": 8,
   "issues": [
     {
       "key": "msg_level_up",
@@ -109,5 +110,6 @@ Respond with a JSON object:
     }
   ]
 }
-```
+
+If there are no issues, return: {"total_keys": N, "reviewed_keys": N, "issues": []}
 """

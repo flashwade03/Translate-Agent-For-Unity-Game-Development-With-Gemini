@@ -134,21 +134,38 @@ async def run_agent_job(app, job_id: str):
         # If review job, try to parse and store the report
         if job.type.value == "review" and response_text:
             import json
+            import re
             try:
-                report_data = json.loads(response_text)
+                # Extract JSON from markdown fences if present
+                json_str = response_text
+                fence_match = re.search(r"```(?:json)?\s*\n?(.*?)```", json_str, re.DOTALL)
+                if fence_match:
+                    json_str = fence_match.group(1).strip()
+
+                report_data = json.loads(json_str)
                 from backend.models import ReviewReport, ReviewIssue
                 from datetime import datetime, timezone
+                import uuid
+
+                issues = []
+                for i, raw in enumerate(report_data.get("issues", [])):
+                    if "id" not in raw:
+                        raw["id"] = f"issue_{uuid.uuid4().hex[:8]}"
+                    issues.append(ReviewIssue(**raw))
+
                 report = ReviewReport(
                     project_id=job.project_id,
                     sheet_name=job.sheet_name,
-                    total_keys=report_data.get("total_keys", 0),
-                    reviewed_keys=report_data.get("reviewed_keys", 0),
-                    issues=[ReviewIssue(**i) for i in report_data.get("issues", [])],
+                    total_keys=report_data.get("total_keys", job.total_keys),
+                    reviewed_keys=report_data.get("reviewed_keys", job.total_keys),
+                    issues=issues,
                     created_at=datetime.now(timezone.utc).isoformat(),
                 )
                 job_svc.store_review_report(job.project_id, job.sheet_name, report)
-            except (json.JSONDecodeError, Exception):
-                pass  # Agent response wasn't parseable JSON — ok for v0
+                logger.info("Job %s: stored review report with %d issues", job_id, len(issues))
+            except Exception as e:
+                logger.warning("Job %s: failed to parse review response: %s", job_id, e)
+                logger.debug("Job %s: response_text=%s", job_id, response_text[:500])
 
     except Exception as e:
         logger.exception("Job %s failed", job_id)
