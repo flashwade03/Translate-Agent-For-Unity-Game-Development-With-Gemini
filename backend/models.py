@@ -229,3 +229,15 @@ class RowUpdate(_CamelModel):
 class AddLanguagePayload(_CamelModel):
     code: str
     label: str
+
+
+class CreateSheetPayload(_CamelModel):
+    name: str
+
+
+class AddRowPayload(_CamelModel):
+    key: str
+
+
+class DeleteRowsPayload(_CamelModel):
+    keys: list[str]

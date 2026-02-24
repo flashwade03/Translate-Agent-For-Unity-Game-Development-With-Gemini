@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from backend.models import SheetData, RowUpdate
+from backend.models import SheetData, RowUpdate, AddLanguagePayload, CreateSheetPayload, AddRowPayload, DeleteRowsPayload
 from backend.services.project_service import ProjectService
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["sheets"])
@@ -14,6 +14,43 @@ async def list_sheets(project_id: str, request: Request):
     sheets_svc = request.app.state.sheets_service
     return sheets_svc.list_sheets(project_id)
 
+
+
+
+@router.post("/sheets", status_code=201)
+async def create_sheet(project_id: str, payload: CreateSheetPayload, request: Request):
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    sheets_svc = request.app.state.sheets_service
+    ok = sheets_svc.create_sheet(project_id, payload.name)
+    if not ok:
+        raise HTTPException(409, "Sheet already exists")
+    return {"ok": True, "name": payload.name}
+
+
+@router.delete("/sheets/{sheet_name}")
+async def delete_sheet(project_id: str, sheet_name: str, request: Request):
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Block deletion if active job exists on this sheet
+    job_svc = request.app.state.job_service
+    active_jobs = [
+        j for j in job_svc._jobs.values()
+        if j.project_id == project_id
+        and j.sheet_name == sheet_name
+        and j.status in ("pending", "running")
+    ]
+    if active_jobs:
+        raise HTTPException(409, "Cannot delete sheet with active translation jobs")
+
+    sheets_svc = request.app.state.sheets_service
+    key_count = sheets_svc.delete_sheet(project_id, sheet_name)
+    if key_count < 0:
+        raise HTTPException(404, "Sheet not found")
+    return {"ok": True, "deletedKeys": key_count}
 
 @router.get("/sheets/{sheet_name}", response_model=SheetData)
 async def get_sheet_data(project_id: str, sheet_name: str, request: Request):
@@ -41,7 +78,37 @@ async def update_rows(project_id: str, sheet_name: str, updates: list[RowUpdate]
     return {"ok": True}
 
 
-from backend.models import AddLanguagePayload
+
+
+@router.post("/sheets/{sheet_name}/rows", status_code=201)
+async def add_row(project_id: str, sheet_name: str, payload: AddRowPayload, request: Request):
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    sheets_svc = request.app.state.sheets_service
+    ok = sheets_svc.add_row(project_id, sheet_name, payload.key)
+    if not ok:
+        raise HTTPException(409, "Key already exists or sheet not found")
+    return {"ok": True, "key": payload.key}
+
+
+
+@router.delete("/sheets/{sheet_name}/rows")
+async def delete_rows(project_id: str, sheet_name: str, payload: DeleteRowsPayload, request: Request):
+    # Block deletion if active job exists on this sheet
+    job_svc = request.app.state.job_service
+    active_jobs = [
+        j for j in job_svc._jobs.values()
+        if j.project_id == project_id
+        and j.sheet_name == sheet_name
+        and j.status in ("pending", "running")
+    ]
+    if active_jobs:
+        raise HTTPException(409, "Cannot delete rows with active translation jobs")
+
+    sheets_svc = request.app.state.sheets_service
+    deleted = sheets_svc.delete_rows(project_id, sheet_name, payload.keys)
+    return {"ok": True, "deletedCount": deleted}
 
 
 @router.post("/sheets/{sheet_name}/languages", status_code=201)
