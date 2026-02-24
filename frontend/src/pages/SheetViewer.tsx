@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { useSheetData } from '../hooks/useSheets'
+import { useSheetData, useAddRow, useDeleteRows } from '../hooks/useSheets'
 import { useTranslation } from '../hooks/useTranslation'
 import { useLanguages } from '../hooks/useLanguages'
 import { updateSheetRows } from '../api/sheets'
@@ -10,6 +10,7 @@ import { DataTable } from '../components/DataTable'
 import { JobStatusBanner } from '../components/JobStatusBanner'
 import { AddLanguageModal } from '../components/AddLanguageModal'
 import { DeleteLanguageDialog } from '../components/DeleteLanguageDialog'
+import { DeleteRowsDialog } from '../components/DeleteRowsDialog'
 import { Button } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
 
@@ -19,10 +20,13 @@ export default function SheetViewer() {
   const { data, isLoading, error } = useSheetData(projectId!, sheetName!)
   const { job, isRunning, trigger, dismiss } = useTranslation(projectId!, sheetName!)
   const { addMutation, deleteMutation } = useLanguages(projectId!, sheetName!)
+  const addRowMutation = useAddRow(projectId!, sheetName!)
+  const deleteRowsMutation = useDeleteRows(projectId!, sheetName!)
 
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; label: string } | null>(null)
   const [deleteTranslationCount, setDeleteTranslationCount] = useState(0)
+  const [pendingDeleteKeys, setPendingDeleteKeys] = useState<string[]>([])
 
   const saveMutation = useMutation({
     mutationFn: (updates: { key: string; langCode: string; value: string }[]) =>
@@ -64,6 +68,16 @@ export default function SheetViewer() {
         },
       })
     }
+  }
+
+  const handleDeleteRows = (keys: string[]) => {
+    setPendingDeleteKeys(keys)
+  }
+
+  const handleConfirmDeleteRows = () => {
+    deleteRowsMutation.mutate(pendingDeleteKeys, {
+      onSuccess: () => setPendingDeleteKeys([]),
+    })
   }
 
   if (isLoading) {
@@ -129,6 +143,8 @@ export default function SheetViewer() {
         onCellSave={handleCellSave}
         onDeleteLanguage={handleDeleteLanguage}
         onAddLanguage={() => setAddModalOpen(true)}
+        onAddRow={(key) => addRowMutation.mutate(key)}
+        onDeleteRows={handleDeleteRows}
       />
 
       <AddLanguageModal
@@ -146,6 +162,13 @@ export default function SheetViewer() {
           translationCount={deleteTranslationCount}
         />
       )}
+
+      <DeleteRowsDialog
+        open={pendingDeleteKeys.length > 0}
+        onClose={() => setPendingDeleteKeys([])}
+        onConfirm={handleConfirmDeleteRows}
+        count={pendingDeleteKeys.length}
+      />
     </div>
   )
 }
