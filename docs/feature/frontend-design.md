@@ -30,7 +30,7 @@ React 대시보드로 프로젝트 관리, 스프레드시트 뷰어, 번역 실
 
 - Must: 비동기 번역 job의 진행률을 사용자에게 표시
 - Must: 소스 언어 셀은 편집 불가로 표시
-- Must not: 프론트엔드에서 Google Sheets API 직접 호출 (백엔드 경유)
+- Must not: 프론트엔드에서 데이터 소스에 직접 접근 (백엔드 API 경유)
 
 ## Scope
 

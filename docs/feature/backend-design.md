@@ -37,7 +37,7 @@ FastAPI 서버로 에이전트 실행을 래핑하고, 프로젝트/설정 관�
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : POST /translate
+    [*] --> pending : 번역 요청
     pending --> running : Runner 시작
     running --> completed : 에이전트 성공
     running --> failed : 에이전트 에러
