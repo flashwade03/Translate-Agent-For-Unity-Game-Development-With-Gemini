@@ -8,7 +8,7 @@ class JobService:
         self._jobs: dict[str, TranslationJob] = {}
         self._review_reports: dict[str, ReviewReport] = {}
 
-    def create_job(self, project_id: str, sheet_name: str, job_type: str) -> TranslationJob:
+    def create_job(self, project_id: str, sheet_name: str, job_type: str, total_keys: int = 0) -> TranslationJob:
         job_id = f"job_{uuid.uuid4().hex[:8]}"
         job = TranslationJob(
             job_id=job_id,
@@ -16,6 +16,7 @@ class JobService:
             sheet_name=sheet_name,
             type=JobType(job_type),
             status=JobStatus.pending,
+            total_keys=total_keys,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self._jobs[job_id] = job

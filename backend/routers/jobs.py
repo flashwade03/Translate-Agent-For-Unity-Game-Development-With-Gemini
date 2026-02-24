@@ -16,7 +16,15 @@ async def create_job(
     request: Request,
 ):
     job_svc = request.app.state.job_service
-    job = job_svc.create_job(project_id, sheet_name, payload.type.value)
+    sheets_svc = request.app.state.sheets_service
+
+    # Count keys from the CSV for progress tracking
+    total_keys = 0
+    sheet_data = sheets_svc.get_sheet_data(project_id, sheet_name)
+    if sheet_data:
+        total_keys = len(sheet_data.rows)
+
+    job = job_svc.create_job(project_id, sheet_name, payload.type.value, total_keys=total_keys)
 
     # Schedule agent execution in background
     background_tasks.add_task(run_agent_job, request.app, job.job_id)
