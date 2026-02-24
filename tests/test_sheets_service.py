@@ -38,3 +38,56 @@ def test_delete_rows_empty_list(svc):
     assert deleted == 0
     data = svc.get_sheet_data("test_proj", "UI")
     assert len(data.rows) == 3
+
+
+def test_add_row_success(svc):
+    result = svc.add_row("test_proj", "UI", "new_key")
+    assert result is True
+    data = svc.get_sheet_data("test_proj", "UI")
+    assert len(data.rows) == 4
+    new_row = next(r for r in data.rows if r["key"] == "new_key")
+    assert new_row["en"] == ""
+    assert new_row["ja"] == ""
+
+
+def test_add_row_duplicate_rejected(svc):
+    result = svc.add_row("test_proj", "UI", "btn_start")
+    assert result is False
+
+
+def test_create_sheet_copies_headers(svc):
+    result = svc.create_sheet("test_proj", "Items")
+    assert result is True
+    data = svc.get_sheet_data("test_proj", "Items")
+    assert "English(en)" in data.headers
+    assert "Japanese(ja)" in data.headers
+    assert len(data.rows) == 0
+
+
+def test_create_sheet_duplicate_rejected(svc):
+    result = svc.create_sheet("test_proj", "UI")
+    assert result is False
+
+
+def test_delete_sheet_returns_key_count(svc):
+    count = svc.delete_sheet("test_proj", "UI")
+    assert count == 3
+    csv_path = svc.projects_dir / "test_proj" / "sheets" / "UI.csv"
+    assert not csv_path.exists()
+
+
+def test_get_sheet_data_structure(svc):
+    data = svc.get_sheet_data("test_proj", "UI")
+    assert data.sheet_name == "UI"
+    assert len(data.languages) == 2
+    assert data.languages[0].code == "en"
+    assert data.languages[0].is_source is True
+    assert data.languages[1].code == "ja"
+    assert len(data.rows) == 3
+
+
+def test_update_cells(svc):
+    svc.update_cells("test_proj", "UI", [{"key": "btn_start", "lang_code": "en", "value": "Begin"}])
+    data = svc.get_sheet_data("test_proj", "UI")
+    row = next(r for r in data.rows if r["key"] == "btn_start")
+    assert row["en"] == "Begin"
