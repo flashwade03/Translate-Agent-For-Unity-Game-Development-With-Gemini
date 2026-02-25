@@ -5,15 +5,20 @@ import type { SheetData } from '../types'
 interface DataTableProps {
   data: SheetData
   disabled?: boolean
+  visibleLanguages?: string[] | null
   onCellSave: (key: string, langCode: string, value: string) => void
   onDeleteLanguage?: (code: string) => void
   onAddLanguage?: () => void
   onAddRow?: (key: string) => void
   onDeleteRows?: (keys: string[]) => void
+  onToggleVisibility?: (code: string) => void
 }
 
-export function DataTable({ data, disabled, onCellSave, onDeleteLanguage, onAddLanguage, onAddRow, onDeleteRows }: DataTableProps) {
+export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDeleteLanguage, onAddLanguage, onAddRow, onDeleteRows, onToggleVisibility }: DataTableProps) {
   const { languages, rows } = data
+
+  const isVisible = (code: string) => !visibleLanguages || visibleLanguages.includes(code)
+  const displayedLanguages = languages.filter((l) => isVisible(l.code))
   const [newKey, setNewKey] = useState('')
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
 
@@ -73,28 +78,55 @@ export function DataTable({ data, disabled, onCellSave, onDeleteLanguage, onAddL
               <th className="text-left px-3 py-2 font-medium text-text-muted w-48 sticky left-0 bg-bg-muted">
                 Key
               </th>
-              {languages.map((lang) => (
-                <th
-                  key={lang.code}
-                  className="text-left px-3 py-2 font-medium text-text-muted min-w-[200px]"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    {lang.label}
-                    {lang.isSource && (
-                      <span className="text-xs text-accent font-normal">(source)</span>
-                    )}
-                    {!lang.isSource && onDeleteLanguage && (
-                      <button
-                        onClick={() => onDeleteLanguage(lang.code)}
-                        className="ml-1 text-text-muted hover:text-error text-xs cursor-pointer"
-                        title={`Delete ${lang.label}`}
-                      >
-                        &times;
-                      </button>
-                    )}
-                  </span>
-                </th>
-              ))}
+              {languages.map((lang) => {
+                const visible = isVisible(lang.code)
+                if (!visible && !onToggleVisibility) return null
+                return (
+                  <th
+                    key={lang.code}
+                    className={`text-left px-3 py-2 font-medium text-text-muted ${visible ? 'min-w-[200px]' : 'w-10'}`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {onToggleVisibility && (
+                        <button
+                          onClick={() => onToggleVisibility(lang.code)}
+                          className="text-text-muted hover:text-accent cursor-pointer shrink-0"
+                          title={visible ? `Hide ${lang.label}` : `Show ${lang.label}`}
+                        >
+                          {visible ? (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      {visible && (
+                        <>
+                          {lang.label}
+                          {lang.isSource && (
+                            <span className="text-xs text-accent font-normal">(source)</span>
+                          )}
+                          {!lang.isSource && onDeleteLanguage && (
+                            <button
+                              onClick={() => onDeleteLanguage(lang.code)}
+                              className="ml-1 text-text-muted hover:text-error text-xs cursor-pointer"
+                              title={`Delete ${lang.label}`}
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  </th>
+                )
+              })}
               {onAddLanguage && (
                 <th className="px-3 py-2 w-12">
                   <button
@@ -126,16 +158,21 @@ export function DataTable({ data, disabled, onCellSave, onDeleteLanguage, onAddL
                 <td className="px-3 py-1.5 font-mono text-xs text-text-muted sticky left-0 bg-white">
                   {row.key}
                 </td>
-                {languages.map((lang) => (
-                  <td key={lang.code} className="px-1 py-0.5">
-                    <EditableCell
-                      value={row[lang.code] ?? ''}
-                      isEmpty={!row[lang.code]}
-                      disabled={disabled}
-                      onSave={(val) => onCellSave(row.key, lang.code, val)}
-                    />
-                  </td>
-                ))}
+                {languages.map((lang) => {
+                  const visible = isVisible(lang.code)
+                  if (!visible && !onToggleVisibility) return null
+                  if (!visible) return <td key={lang.code} />
+                  return (
+                    <td key={lang.code} className="px-1 py-0.5">
+                      <EditableCell
+                        value={row[lang.code] ?? ''}
+                        isEmpty={!row[lang.code]}
+                        disabled={disabled}
+                        onSave={(val) => onCellSave(row.key, lang.code, val)}
+                      />
+                    </td>
+                  )
+                })}
                 {onAddLanguage && <td />}
               </tr>
             ))}
@@ -168,11 +205,15 @@ export function DataTable({ data, disabled, onCellSave, onDeleteLanguage, onAddL
                     </button>
                   </form>
                 </td>
-                {languages.map((lang) => (
-                  <td key={lang.code} className="px-1 py-0.5 text-text-muted/30 text-xs italic">
-                    {/* empty cells for new row placeholder */}
-                  </td>
-                ))}
+                {languages.map((lang) => {
+                  const visible = isVisible(lang.code)
+                  if (!visible && !onToggleVisibility) return null
+                  return (
+                    <td key={lang.code} className="px-1 py-0.5 text-text-muted/30 text-xs italic">
+                      {/* empty cells for new row placeholder */}
+                    </td>
+                  )
+                })}
                 {onAddLanguage && <td />}
               </tr>
             )}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSheetSettings, useUpdateSheetSettings } from '../hooks/useSheetSettings'
+import { useProjectLanguages } from '../hooks/useProjectLanguages'
 import { Modal } from './ui/Modal'
 import { Input } from './ui/Input'
 import { Textarea } from './ui/Textarea'
@@ -17,6 +18,7 @@ interface SheetSettingsDialogProps {
 export function SheetSettingsDialog({ open, onClose, projectId, sheetName }: SheetSettingsDialogProps) {
   const { data, isLoading } = useSheetSettings(projectId, sheetName)
   const updateMutation = useUpdateSheetSettings(projectId, sheetName)
+  const { data: projectLangs } = useProjectLanguages(projectId)
 
   const [form, setForm] = useState<SheetSettings>({
     sourceLanguage: null,
@@ -24,6 +26,7 @@ export function SheetSettingsDialog({ open, onClose, projectId, sheetName }: She
     characterLimit: null,
     glossaryOverride: null,
     instructions: null,
+    visibleLanguages: null,
   })
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export function SheetSettingsDialog({ open, onClose, projectId, sheetName }: She
       characterLimit: form.characterLimit,
       glossaryOverride: form.glossaryOverride || null,
       instructions: form.instructions || null,
+      visibleLanguages: form.visibleLanguages,
     }
     updateMutation.mutate(payload, { onSuccess: onClose })
   }
@@ -53,18 +57,42 @@ export function SheetSettingsDialog({ open, onClose, projectId, sheetName }: She
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            label="Source Language"
-            value={form.sourceLanguage ?? ''}
-            onChange={(e) => setForm({ ...form, sourceLanguage: e.target.value || null })}
-            placeholder={defaults?.sourceLanguage ?? 'en'}
-          />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-[var(--foreground)]">Source Language</label>
+            <div className="relative">
+              <select
+                value={form.sourceLanguage ?? ''}
+                onChange={(e) => setForm({ ...form, sourceLanguage: e.target.value || null })}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-sm bg-white appearance-none pr-8 outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+              >
+                <option value="">
+                  {defaults?.sourceLanguage
+                    ? `${projectLangs?.find((l) => l.code === defaults.sourceLanguage)?.label ?? defaults.sourceLanguage} (${defaults.sourceLanguage}) — project default`
+                    : 'Select source language...'}
+                </option>
+                {projectLangs?.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label} ({lang.code})
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)] pointer-events-none"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
+          </div>
 
           <Input
             label="Translation Style"
             value={form.translationStyle ?? ''}
             onChange={(e) => setForm({ ...form, translationStyle: e.target.value || null })}
-            placeholder={defaults?.translationStyle || 'e.g. casual, formal, playful'}
+            placeholder={defaults?.translationStyle || 'e.g. formal, casual, playful...'}
           />
 
           <Input
@@ -77,24 +105,34 @@ export function SheetSettingsDialog({ open, onClose, projectId, sheetName }: She
                 characterLimit: e.target.value ? Number(e.target.value) : null,
               })
             }
-            placeholder={defaults?.characterLimit != null ? String(defaults.characterLimit) : 'No limit'}
+            placeholder={defaults?.characterLimit != null ? String(defaults.characterLimit) : '0 (no limit)'}
           />
 
-          <Textarea
-            label="Glossary Override"
-            value={form.glossaryOverride ?? ''}
-            onChange={(e) => setForm({ ...form, glossaryOverride: e.target.value || null })}
-            placeholder="source_term → translated_term (one per line)"
-            rows={3}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Textarea
+              label="Glossary Override"
+              value={form.glossaryOverride ?? ''}
+              onChange={(e) => setForm({ ...form, glossaryOverride: e.target.value || null })}
+              placeholder="source_term → translated_term (one per line)"
+              rows={3}
+            />
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Additional term pairs that override project glossary for this sheet only.
+            </p>
+          </div>
 
-          <Textarea
-            label="Custom Instructions"
-            value={form.instructions ?? ''}
-            onChange={(e) => setForm({ ...form, instructions: e.target.value || null })}
-            placeholder={defaults?.instructions || 'Extra context or instructions for the translator agent...'}
-            rows={4}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Textarea
+              label="Custom Instructions"
+              value={form.instructions ?? ''}
+              onChange={(e) => setForm({ ...form, instructions: e.target.value || null })}
+              placeholder={defaults?.instructions || 'e.g. This sheet contains UI button labels. Keep translations short and action-oriented.'}
+              rows={4}
+            />
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Free-form instructions for the translator agent when processing this sheet.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-2 mt-2">
             <Button variant="outline" type="button" onClick={onClose}>

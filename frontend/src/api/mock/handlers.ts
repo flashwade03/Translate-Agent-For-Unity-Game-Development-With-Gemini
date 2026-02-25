@@ -1,5 +1,6 @@
 import {
   mockProjects,
+  mockProjectLanguages,
   mockSheetNames,
   mockSheetData,
   mockProjectDefaults,
@@ -165,6 +166,7 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
       characterLimit: null,
       glossaryOverride: '',
       instructions: '',
+      visibleLanguages: null,
     }
     if (method === 'GET') {
       const settings: SheetSettings = mockSheetSettings[key] || {
@@ -173,6 +175,7 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
         characterLimit: null,
         glossaryOverride: null,
         instructions: null,
+        visibleLanguages: null,
       }
       return {
         projectId: params.projectId,
@@ -269,7 +272,53 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
     return mockJobHistory[params.projectId] || []
   }
 
-  // Language Management
+  // Project Languages
+  params = match('/api/projects/:projectId/languages', path)
+  if (params && method === 'GET') {
+    return mockProjectLanguages[params.projectId] || []
+  }
+  if (params && method === 'POST') {
+    const { code, label } = body as { code: string; label: string }
+    const langs = mockProjectLanguages[params.projectId] || []
+    if (langs.some((l) => l.code === code)) {
+      throw new Error('Language already exists')
+    }
+    langs.push({ code, label })
+    mockProjectLanguages[params.projectId] = langs
+    return { code, label }
+  }
+
+  params = match('/api/projects/:projectId/languages/:code', path)
+  if (params && method === 'DELETE') {
+    const langs = mockProjectLanguages[params.projectId] || []
+    const idx = langs.findIndex((l) => l.code === params!.code)
+    if (idx < 0) throw new Error('Language not found')
+    langs.splice(idx, 1)
+    mockProjectLanguages[params.projectId] = langs
+
+    // Calculate affected stats from mock sheet data
+    let affectedSheets = 0
+    let affectedTranslations = 0
+    for (const key of Object.keys(mockSheetData)) {
+      if (key.startsWith(`${params.projectId}/`)) {
+        const data = mockSheetData[key]
+        const langIdx = data.languages.findIndex((l) => l.code === params!.code)
+        if (langIdx >= 0) {
+          affectedSheets++
+          for (const row of data.rows) {
+            if (row[params!.code]) affectedTranslations++
+            delete row[params!.code]
+          }
+          data.languages.splice(langIdx, 1)
+          const headerIdx = data.headers.findIndex((h) => h.includes(`(${params!.code})`))
+          if (headerIdx >= 0) data.headers.splice(headerIdx, 1)
+        }
+      }
+    }
+    return { ok: true, affectedSheets, affectedTranslations }
+  }
+
+  // Sheet-level Language Management
   params = match('/api/projects/:projectId/sheets/:sheetName/languages', path)
   if (params && method === 'POST') {
     const { code, label } = body as { code: string; label: string }

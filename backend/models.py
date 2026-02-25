@@ -88,6 +88,17 @@ class Language(_CamelModel):
     is_source: bool
 
 
+class ProjectLanguage(_CamelModel):
+    code: str
+    label: str
+
+
+class LanguageDeleteImpact(_CamelModel):
+    ok: bool = True
+    affected_sheets: int = 0
+    affected_translations: int = 0
+
+
 # SheetRow is a dict with a required "key" and arbitrary lang-code values.
 # We use dict[str, str] in Python; no dedicated model needed.
 SheetRow = dict[str, str]
@@ -185,6 +196,7 @@ class SheetSettings(_CamelModel):
     character_limit: int | None = None
     glossary_override: str | None = None
     instructions: str | None = None
+    visible_languages: list[str] | None = None
 
 
 class SheetSettingsResponse(_CamelModel):

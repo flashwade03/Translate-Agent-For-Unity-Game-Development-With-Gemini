@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useSheetData, useAddRow, useDeleteRows } from '../hooks/useSheets'
 import { useTranslation } from '../hooks/useTranslation'
 import { useLanguages } from '../hooks/useLanguages'
+import { useSheetSettings, useUpdateSheetSettings } from '../hooks/useSheetSettings'
 import { updateSheetRows } from '../api/sheets'
 import { PageHeader } from '../components/layout/PageHeader'
 import { DataTable } from '../components/DataTable'
@@ -22,6 +23,8 @@ export default function SheetViewer() {
   const { addMutation, deleteMutation } = useLanguages(projectId!, sheetName!)
   const addRowMutation = useAddRow(projectId!, sheetName!)
   const deleteRowsMutation = useDeleteRows(projectId!, sheetName!)
+  const { data: settingsData } = useSheetSettings(projectId!, sheetName!)
+  const updateSettings = useUpdateSheetSettings(projectId!, sheetName!)
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
@@ -79,6 +82,24 @@ export default function SheetViewer() {
     deleteRowsMutation.mutate(pendingDeleteKeys, {
       onSuccess: () => setPendingDeleteKeys([]),
     })
+  }
+
+  const handleToggleVisibility = (code: string) => {
+    if (!data || !settingsData) return
+    const current = settingsData.settings.visibleLanguages
+    let next: string[]
+    if (!current) {
+      // Currently all visible, hide this one
+      next = data.languages.map((l) => l.code).filter((c) => c !== code)
+    } else if (current.includes(code)) {
+      next = current.filter((c) => c !== code)
+    } else {
+      next = [...current, code]
+    }
+    // If all are visible again, set to null
+    const allCodes = data.languages.map((l) => l.code)
+    const newVisible = next.length >= allCodes.length ? null : next.length === 0 ? null : next
+    updateSettings.mutate({ ...settingsData.settings, visibleLanguages: newVisible })
   }
 
   if (isLoading) {
@@ -139,17 +160,21 @@ export default function SheetViewer() {
       <DataTable
         data={data}
         disabled={isRunning}
+        visibleLanguages={settingsData?.settings.visibleLanguages}
         onCellSave={handleCellSave}
         onDeleteLanguage={handleDeleteLanguage}
         onAddLanguage={() => setAddModalOpen(true)}
         onAddRow={(key) => addRowMutation.mutate(key)}
         onDeleteRows={handleDeleteRows}
+        onToggleVisibility={handleToggleVisibility}
       />
 
       <AddLanguageModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onConfirm={handleAddLanguage}
+        projectId={projectId!}
+        existingCodes={data.languages.map((l) => l.code)}
       />
 
       {deleteTarget && (

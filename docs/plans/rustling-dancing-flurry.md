@@ -1,141 +1,122 @@
-# Frontend Implementation Plan
+# Screen 3 — Sheet Settings 모달 전환 + 설계 문서 정합성
 
 ## Context
 
-프론트엔드 디자인(Pencil 6개 화면)과 설계 문서(docs/feature/frontend-design.md)가 완료되었다. 백엔드는 아직 없으므로 mock API로 독립 개발한다. 코드가 전혀 없는 상태에서 React 앱을 처음부터 구축한다.
+Sheet Settings가 이미 구현되어 있으나 설계 문서와 여러 차이가 있다:
+- **프론트엔드**: 별도 페이지 → 설계는 모달 다이얼로그
+- **백엔드 저장**: 시트별 개별 YAML (`sheets/<name>.yaml`) → 설계는 프로젝트 `config.yaml` 내 시트별 섹션
+- **모델**: `glossaryOverride`가 `bool` → 설계/Pencil은 텍스트 입력 (용어 쌍 문자열)
+- **UI**: Translation Style이 `<select>` → Pencil은 자유 텍스트 입력
+- **프로젝트 기본값**: 미구현 → 설계는 "미설정 필드는 프로젝트 기본값을 placeholder로 표시"
+- **오버라이드 전용 저장**: 미구현 → 설계는 "시트별 오버라이드만 저장"
 
-## Tech Stack
+## Tasks
 
-- React 18+ (TypeScript strict), Vite, TanStack Query, Tailwind CSS v4, React Router v6
+### Task 1: Backend 모델 + 저장소 리팩터
 
-## Directory Structure
+**파일**: `backend/models.py`, `backend/services/config_service.py`
 
-```
-frontend/
-├── src/
-│   ├── main.tsx                 # providers (QueryClient, Router)
-│   ├── App.tsx                  # route definitions
-│   ├── index.css                # Tailwind + design tokens
-│   ├── api/
-│   │   ├── client.ts            # fetch wrapper + VITE_MOCK_API switch
-│   │   ├── projects.ts          # project API functions
-│   │   ├── sheets.ts            # sheet API functions
-│   │   ├── translation.ts       # job trigger/poll API
-│   │   ├── config.ts            # glossary, style guide, sheet context API
-│   │   └── mock/
-│   │       ├── handlers.ts      # path-matching mock dispatcher
-│   │       └── data.ts          # mock data objects
-│   ├── hooks/                   # TanStack Query hooks (1 file per domain)
-│   ├── types/                   # TypeScript interfaces (1 file per domain)
-│   ├── components/
-│   │   ├── ui/                  # Button, Input, Textarea, Badge, Card, Modal, Spinner
-│   │   ├── layout/              # Sidebar, PageHeader, ProjectLayout
-│   │   ├── ProjectCard.tsx
-│   │   ├── DataTable.tsx        # reusable table with EditableCell
-│   │   ├── EditableCell.tsx
-│   │   └── JobStatusBanner.tsx
-│   ├── pages/                   # 6 screens (1 file each)
-│   └── lib/
-│       ├── constants.ts         # query keys
-│       └── utils.ts             # helpers
-```
+모델 변경:
+- `SheetSettings.glossary_override`: `bool` → `str = ""`
+- 모든 설정 필드를 `Optional`로 변경 (null = 프로젝트 기본값 사용)
+- `SheetSettingsResponse` 추가: 시트 오버라이드 + `projectDefaults` 포함
 
-## Routing
+저장소 리팩터 (`config_service.py`):
+- `get_sheet_settings()`: config.yaml에서 `sheet_settings.<sheet_name>` 섹션 읽기
+- `update_sheet_settings()`: config.yaml의 해당 섹션에 오버라이드만 저장 (null/빈값은 제거)
+- `get_project_defaults()`: config.yaml에서 `defaults` 섹션 읽기 (없으면 하드코딩 기본값)
+- 기존 per-sheet YAML 파일 로직 삭제
 
-```
-/                                → ProjectList (standalone, no sidebar)
-/projects/:projectId             → ProjectLayout > SheetViewer (first sheet)
-/projects/:projectId/sheets/:sheetName         → SheetViewer
-/projects/:projectId/sheets/:sheetName/settings → SheetSettings
-/projects/:projectId/glossary    → GlossaryEditor
-/projects/:projectId/style-guide → StyleGuideEditor
-/projects/:projectId/reports     → ReviewReport
+config.yaml 구조:
+```yaml
+name: "Opal App"
+description: "..."
+defaults:
+  source_language: "en"
+  translation_style: ""
+  character_limit: null
+  glossary_override: ""
+  instructions: ""
+sheet_settings:
+  UI:
+    translation_style: "formal"
+    character_limit: 30
 ```
 
-ProjectLayout = Sidebar + `<Outlet />`. URL params drive all state.
+### Task 2: Backend 라우터 업데이트
 
-## Mock API Strategy
+**파일**: `backend/routers/config.py`
 
-`api/client.ts`에서 `VITE_MOCK_API` env로 분기. mock 모드에서는 `mock/handlers.ts`가 path matching으로 `mock/data.ts` 반환. 백엔드 완성 시 env만 변경하면 전환 완료.
+- `GET /settings` 응답에 `projectDefaults` 포함
+- `PUT /settings` 요청에서 null 필드는 오버라이드 제거 (기본값 복원)
 
-Job polling mock: POST trigger → jobId 반환, GET poll 3회 후 completed로 전이.
+### Task 3: Backend 테스트
 
-## Implementation Phases (순서대로, 각 단계마다 브라우저에서 확인 가능)
+**파일**: `tests/test_config_api.py` (기존 수정)
 
-### Phase 0: Scaffolding
-- `npm create vite` (react-ts) + 의존성 설치
-- vite.config.ts (Tailwind plugin, /api proxy)
-- index.css (Tailwind imports + design tokens: Inter, #2563EB, #E4E4E7)
-- index.html에 Inter 폰트 링크
-- main.tsx (QueryClientProvider + RouterProvider)
+- config.yaml 기반 저장소 테스트
+- 프로젝트 기본값 상속 테스트
+- 오버라이드 저장/제거 테스트
+- glossary_override 문자열 타입 테스트
 
-### Phase 1: Types + Constants
-- types/ 전체 (project, sheet, translation, glossary, styleGuide, sheetSettings, review)
-- lib/constants.ts (query keys)
+### Task 4: Frontend 타입 + API + Mock 업데이트
 
-### Phase 2: UI Primitives
-- Button (Primary/Outline), Input, Textarea, Badge, Card, Modal, Spinner
+**파일**: `frontend/src/types/sheetSettings.ts`, `frontend/src/api/mock/handlers.ts`, `frontend/src/api/mock/data.ts`
 
-### Phase 3: Mock API Layer
-- api/client.ts, mock/data.ts, mock/handlers.ts
-- api/projects.ts, sheets.ts, translation.ts, config.ts
+- `SheetSettings` 타입: `glossaryOverride` → `string`, 모든 필드 optional (`| null`)
+- `SheetSettingsResponse` 타입 추가: `settings` + `projectDefaults`
+- Mock 핸들러: 기본값 응답에 `projectDefaults` 포함
+- API 함수 반환 타입 업데이트
 
-### Phase 4: Screen 1 — Project List
-- ProjectCard, CreateProjectModal
-- hooks/useProjects.ts
-- pages/ProjectList.tsx
+### Task 5: Frontend SheetSettingsDialog 컴포넌트
 
-### Phase 5: Layout Shell
-- Sidebar, PageHeader, ProjectLayout
-- hooks/useSheets.ts (sheet list)
-- App.tsx route wiring
+**파일**: `frontend/src/components/SheetSettingsDialog.tsx` (신규)
 
-### Phase 6: Screen 2 — Sheet Viewer
-- EditableCell (click-to-edit, read-only for source lang, empty cell highlight)
-- DataTable
-- ActionBar (Translate All, Update, Review, Settings buttons)
-- JobStatusBanner
-- hooks/useTranslation.ts (trigger + refetchInterval polling)
-- pages/SheetViewer.tsx
+기존 `pages/SheetSettings.tsx`의 폼 로직을 Modal 기반 다이얼로그로 재작성:
+- `Modal` 컴포넌트 사용 (`max-w-lg`로 확대)
+- Source Language: Input, placeholder에 프로젝트 기본값
+- Translation Style: Input (자유 텍스트), placeholder에 프로젝트 기본값
+- Character Limit: Input type="number", placeholder에 기본값
+- Glossary Override: Textarea, placeholder "source_term → translated_term (one per line)"
+- Custom Instructions: Textarea, placeholder에 프로젝트 기본값
+- Footer: Cancel + Save Changes 버튼
+- null/빈값은 "프로젝트 기본값 사용 중" 의미
 
-### Phase 7: Screen 3 — Sheet Settings
-- hooks/useSheetSettings.ts
-- pages/SheetSettings.tsx (form: source lang, style, char limit, glossary override, instructions)
+### Task 6: Frontend SheetViewer 통합 + 라우트 정리
 
-### Phase 8: Screen 4 — Glossary Editor
-- hooks/useGlossary.ts
-- pages/GlossaryEditor.tsx (search, add, inline edit, delete)
+**파일**: `frontend/src/pages/SheetViewer.tsx`, `frontend/src/App.tsx`
 
-### Phase 9: Screen 5 — Style Guide Editor
-- hooks/useStyleGuide.ts
-- pages/StyleGuideEditor.tsx (tone, formality, audience, rules textarea, examples textarea)
+- SheetViewer에 `settingsOpen` state 추가
+- Settings 버튼: `navigate()` → `setSettingsOpen(true)`
+- SheetSettingsDialog 렌더링
+- `App.tsx`에서 `/settings` 라우트 제거
+- `pages/SheetSettings.tsx` 삭제
 
-### Phase 10: Screen 6 — Review Report
-- pages/ReviewReport.tsx (stat cards, filter badges, issue cards)
+### Task 7: Hook 업데이트
 
-### Phase 11: Polish
-- Loading/error states, empty cell yellow highlight, job 실행 중 편집 비활성화
+**파일**: `frontend/src/hooks/useSheetSettings.ts`
 
-## Key Design Decisions
+- `useSheetSettings` 반환 타입을 `SheetSettingsResponse`로 변경
+- mutation 후 settings + sheetData 모두 invalidate (소스 언어 변경 시 테이블 갱신)
 
-- **Custom DataTable** (v0에서 테이블 라이브러리 불필요 — inline edit + read-only + highlight만 필요)
-- **TanStack Query만으로 서버 상태 관리** (Redux/Zustand 불필요 — 로컬 UI state는 useState)
-- **URL-driven state** (projectId, sheetName은 URL params → deep link 가능)
-- **No WebSocket** (polling으로 충분, 설계 문서 결정 사항)
+### Task 8: 검증
 
-## Design System (from Pencil)
+- `cd /Volumes/FablersBackup/Projects/TranslateForGameAgent && python -m pytest tests/ -v`
+- `cd frontend && npx tsc --noEmit`
+- 브라우저: Sheet Viewer → Settings 버튼 → 모달 열림/저장/닫기
 
-- Font: Inter
-- Accent: #2563EB
-- Border: #E4E4E7, 1px, no shadows
-- Background: #FFFFFF
-- Radius: 6px (sm), 8px (md), 12px (lg)
+## Critical Files
 
-## Verification
-
-1. `cd frontend && npm run dev` → 브라우저에서 전체 6개 화면 네비게이션 확인
-2. Project List → 카드 클릭 → Sheet Viewer 진입 확인
-3. Sheet Viewer에서 Translate All 클릭 → JobStatusBanner 진행률 표시 → 완료 후 데이터 새로고침
-4. Source language 컬럼 클릭 시 편집 불가 확인
-5. Glossary Editor에서 Add/Edit/Delete 동작 확인
-6. Review Report에서 필터 badge 클릭 시 이슈 필터링 확인
+| 파일 | 작업 |
+|------|------|
+| `backend/models.py` | SheetSettings 모델 수정, SheetSettingsResponse 추가 |
+| `backend/services/config_service.py` | config.yaml 기반 저장소로 리팩터 |
+| `backend/routers/config.py` | 응답에 projectDefaults 포함 |
+| `tests/test_config_api.py` | 테스트 리팩터 |
+| `frontend/src/types/sheetSettings.ts` | 타입 수정 |
+| `frontend/src/components/SheetSettingsDialog.tsx` | 신규 모달 컴포넌트 |
+| `frontend/src/pages/SheetViewer.tsx` | 모달 통합 |
+| `frontend/src/pages/SheetSettings.tsx` | 삭제 |
+| `frontend/src/App.tsx` | /settings 라우트 제거 |
+| `frontend/src/hooks/useSheetSettings.ts` | 반환 타입 변경 |
+| `frontend/src/api/mock/handlers.ts` | mock 응답 수정 |

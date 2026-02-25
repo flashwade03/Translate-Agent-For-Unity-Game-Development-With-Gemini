@@ -54,7 +54,7 @@ adk run game_translator
 
 - 플레이스홀더 (`{0}`, `{1}`) 번역 시 반드시 원본 그대로 보존
 - 기준 언어가 유동적 (영어 외 다른 언어도 원문 가능)
-- CSV 헤더에서 언어 코드 자동 감지 (예: `Japanese(ja)` -> `ja`)
+- CSV 헤더에서 언어 코드 자동 감지 (예: `Japanese(ja)` -> `ja`, `Chinese (Simplified)(zh-Hans)` -> `zh-Hans`). locale 코드에 하이픈 포함 가능.
 - `.env`에 `GOOGLE_API_KEY` 필요 (Gemini API용)
 - CSV 파일은 `projects/<name>/sheets/` 디렉토리에 배치. 시트 수는 CSV 파일 개수에서 동적 산출.
 
@@ -65,5 +65,5 @@ adk run game_translator
 | 문서 | 참조 시점 |
 |------|----------|
 | `docs/feature/agent-design.md` | 에이전트 구조, CSV 도구, 번역 워크플로우, 제약 조건 확인 시 |
-| `docs/feature/backend-design.md` | API 설계, CSV 시트 관리, 행(key) CRUD, 비동기 job 모델, Runner/SessionService, 데이터 흐름, 테스트 전략 확인 시. v1: WebSocket 진행률, Job SQLite 영속화, 언어 관리 API |
-| `docs/feature/frontend-design.md` | 화면 구성, 레이아웃, UX 결정 확인 시. v1: WebSocket 수신, Job History 화면, 언어 추가/삭제 UI |
+| `docs/feature/backend-design.md` | API 설계, CSV 시트 관리, 행(key) CRUD, 시트 설정, 비동기 job 모델, Runner/SessionService, 데이터 흐름, Unity CSV 포맷, 프로젝트 언어 관리, 테스트 전략 확인 시. v1: WebSocket 진행률, Job SQLite 영속화 |
+| `docs/feature/frontend-design.md` | 화면 구성, 레이아웃, UX 결정, 언어 설정 화면, locale 프리셋, 소스 언어 dropdown 확인 시. v1: WebSocket 수신, Job History 화면 |

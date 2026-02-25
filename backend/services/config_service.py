@@ -4,6 +4,7 @@ from pathlib import Path
 from backend.models import (
     SheetSettings, SheetSettingsResponse,
     Glossary, GlossaryEntry, GlossaryEntryCreate, StyleGuide,
+    ProjectLanguage,
 )
 
 _HARDCODED_DEFAULTS = SheetSettings(
@@ -35,6 +36,33 @@ class ConfigService:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             yaml.dump(data, f)
+
+    # --- Project Languages ---
+
+    def get_project_languages(self, project_id: str) -> list[ProjectLanguage]:
+        cfg = self._read_config(project_id)
+        raw = cfg.get("languages") or []
+        return [ProjectLanguage(code=l["code"], label=l["label"]) for l in raw]
+
+    def add_project_language(self, project_id: str, code: str, label: str) -> ProjectLanguage | None:
+        cfg = self._read_config(project_id)
+        langs = cfg.get("languages") or []
+        if any(l["code"] == code for l in langs):
+            return None
+        langs.append({"code": code, "label": label})
+        cfg["languages"] = langs
+        self._write_config(project_id, cfg)
+        return ProjectLanguage(code=code, label=label)
+
+    def delete_project_language(self, project_id: str, code: str) -> bool:
+        cfg = self._read_config(project_id)
+        langs = cfg.get("languages") or []
+        new_langs = [l for l in langs if l["code"] != code]
+        if len(new_langs) == len(langs):
+            return False
+        cfg["languages"] = new_langs
+        self._write_config(project_id, cfg)
+        return True
 
     # --- Sheet Settings ---
 

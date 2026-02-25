@@ -91,3 +91,43 @@ def test_update_cells(svc):
     data = svc.get_sheet_data("test_proj", "UI")
     row = next(r for r in data.rows if r["key"] == "btn_start")
     assert row["en"] == "Begin"
+
+
+# --- Hyphenated locale code tests ---
+
+
+@pytest.fixture
+def svc_hyphen(tmp_path):
+    """SheetsService with hyphenated locale codes."""
+    project_dir = tmp_path / "projects" / "test_proj" / "sheets"
+    project_dir.mkdir(parents=True)
+    csv_path = project_dir / "UI.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Key", "English(en)", "Chinese (Simplified)(zh-Hans)", "Portuguese(pt-BR)"])
+        writer.writerow(["btn_start", "Start", "开始", "Iniciar"])
+    s = SheetsService(projects_dir=tmp_path / "projects")
+    return s
+
+
+def test_parse_hyphenated_locale_codes(svc_hyphen):
+    data = svc_hyphen.get_sheet_data("test_proj", "UI")
+    codes = [l.code for l in data.languages]
+    assert "zh-Hans" in codes
+    assert "pt-BR" in codes
+
+
+def test_update_cells_hyphenated_code(svc_hyphen):
+    ok = svc_hyphen.update_cells("test_proj", "UI", [{"key": "btn_start", "lang_code": "zh-Hans", "value": "启动"}])
+    assert ok is True
+    data = svc_hyphen.get_sheet_data("test_proj", "UI")
+    row = next(r for r in data.rows if r["key"] == "btn_start")
+    assert row["zh-Hans"] == "启动"
+
+
+def test_delete_language_hyphenated_code(svc_hyphen):
+    deleted = svc_hyphen.delete_language("test_proj", "UI", "zh-Hans")
+    assert deleted >= 0
+    data = svc_hyphen.get_sheet_data("test_proj", "UI")
+    codes = [l.code for l in data.languages]
+    assert "zh-Hans" not in codes

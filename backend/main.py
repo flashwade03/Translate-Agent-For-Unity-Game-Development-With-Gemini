@@ -12,9 +12,11 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     from backend.services.sheets_service import SheetsService
     from backend.services.job_service import JobService
+    from backend.services.config_service import ConfigService
 
     app.state.sheets_service = SheetsService()
     app.state.job_service = JobService()
+    app.state.config_service = ConfigService()
 
     from backend.services.job_history_service import JobHistoryService
     job_history_service = JobHistoryService()
@@ -53,7 +55,7 @@ app.add_middleware(
 )
 
 # Routers
-from backend.routers import projects, config, sheets, jobs, job_history, ws  # noqa: E402
+from backend.routers import projects, config, sheets, jobs, job_history, ws, languages  # noqa: E402
 
 app.include_router(projects.router)
 app.include_router(config.router)
@@ -61,6 +63,7 @@ app.include_router(sheets.router)
 app.include_router(jobs.router)
 app.include_router(job_history.router)
 app.include_router(ws.router)
+app.include_router(languages.router)
 
 
 @app.get("/api/health")

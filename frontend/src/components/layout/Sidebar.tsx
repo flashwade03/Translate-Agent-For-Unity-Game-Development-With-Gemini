@@ -107,6 +107,9 @@ export function Sidebar() {
         <div className="text-xs font-medium text-text-muted uppercase tracking-wide mt-4 mb-1 px-3">
           Config
         </div>
+        <NavLink to={`/projects/${projectId}/languages`} className={configLinkClass}>
+          Languages
+        </NavLink>
         <NavLink to={`/projects/${projectId}/glossary`} className={configLinkClass}>
           Glossary
         </NavLink>

@@ -34,7 +34,7 @@ class SheetsService:
         # Parse language headers: "English(en)" -> Language(code="en", label="English")
         languages: list[Language] = []
         for h in headers[1:]:  # skip 'key' column
-            m = re.match(r"(.+)\((\w+)\)", h)
+            m = re.match(r"(.+)\(([^)]+)\)", h)
             if m:
                 languages.append(Language(code=m.group(2), label=m.group(1), is_source=False))
 
@@ -76,7 +76,7 @@ class SheetsService:
         # Build column index: lang_code -> column index
         col_index: dict[str, int] = {}
         for i, h in enumerate(headers[1:], start=1):
-            m = re.match(r".+\((\w+)\)", h)
+            m = re.match(r".+\(([^)]+)\)", h)
             if m:
                 col_index[m.group(1)] = i
 
@@ -151,7 +151,7 @@ class SheetsService:
         # Find column index for this language code
         col_idx = None
         for i, h in enumerate(headers[1:], start=1):
-            m = re.match(r".+\((\w+)\)", h)
+            m = re.match(r".+\(([^)]+)\)", h)
             if m and m.group(1) == code:
                 col_idx = i
                 break
@@ -172,6 +172,23 @@ class SheetsService:
             writer.writerows(new_rows)
 
         return deleted_count
+
+    def delete_language_from_all_sheets(self, project_id: str, code: str) -> dict:
+        """Delete a language column from all CSV sheets. Returns stats."""
+        sheets_dir = self.projects_dir / project_id / "sheets"
+        if not sheets_dir.exists():
+            return {"affected_sheets": 0, "affected_translations": 0}
+
+        affected_sheets = 0
+        affected_translations = 0
+
+        for csv_file in sorted(sheets_dir.glob("*.csv")):
+            count = self.delete_language(project_id, csv_file.stem, code)
+            if count >= 0:
+                affected_sheets += 1
+                affected_translations += count
+
+        return {"affected_sheets": affected_sheets, "affected_translations": affected_translations}
 
     def add_row(self, project_id: str, sheet_name: str, key: str) -> bool:
         """Add a new row with the given key and empty values. Returns False if key already exists."""
@@ -227,22 +244,33 @@ class SheetsService:
         return original_count - len(rows)
 
     def create_sheet(self, project_id: str, sheet_name: str) -> bool:
-        """Create a new empty CSV sheet. Copies language headers from an existing sheet if any."""
+        """Create a new empty CSV sheet using project language config for headers."""
         sheets_dir = self.projects_dir / project_id / "sheets"
         sheets_dir.mkdir(parents=True, exist_ok=True)
         csv_path = sheets_dir / f"{sheet_name}.csv"
         if csv_path.exists():
             return False
 
-        # Copy headers from first existing sheet, or default to just 'key'
-        headers = ["key"]
-        existing = sorted(sheets_dir.glob("*.csv"))
-        if existing:
-            with open(existing[0], newline="", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                first_row = next(reader, None)
-                if first_row:
-                    headers = first_row
+        # Try to read languages from project config.yaml
+        import yaml
+        config_path = self.projects_dir / project_id / "config.yaml"
+        headers = ["Key"]
+        if config_path.exists():
+            with open(config_path) as f:
+                cfg = yaml.safe_load(f) or {}
+            langs = cfg.get("languages") or []
+            if langs:
+                headers = ["Key"] + [f"{l['label']}({l['code']})" for l in langs]
+
+        # Fallback: copy from existing sheet if no project languages
+        if len(headers) == 1:
+            existing = sorted(sheets_dir.glob("*.csv"))
+            if existing:
+                with open(existing[0], newline="", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    first_row = next(reader, None)
+                    if first_row:
+                        headers = first_row
 
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)

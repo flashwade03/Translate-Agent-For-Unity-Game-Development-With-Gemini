@@ -4,6 +4,7 @@ export interface SheetSettings {
   characterLimit: number | null
   glossaryOverride: string | null
   instructions: string | null
+  visibleLanguages: string[] | null
 }
 
 export interface SheetSettingsResponse {

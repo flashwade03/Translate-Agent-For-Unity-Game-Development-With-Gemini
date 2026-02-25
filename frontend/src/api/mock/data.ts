@@ -1,5 +1,6 @@
 import type {
   Project,
+  ProjectLanguage,
   SheetData,
   SheetSettings,
   SheetSettingsResponse,
@@ -82,6 +83,15 @@ export const mockSheetData: Record<string, SheetData> = {
   },
 }
 
+export const mockProjectLanguages: Record<string, ProjectLanguage[]> = {
+  opal_app: [
+    { code: 'en', label: 'English' },
+    { code: 'ja', label: 'Japanese' },
+    { code: 'ko', label: 'Korean' },
+  ],
+  ruby_rpg: [],
+}
+
 export const mockProjectDefaults: Record<string, SheetSettings> = {
   opal_app: {
     sourceLanguage: 'en',
@@ -89,6 +99,7 @@ export const mockProjectDefaults: Record<string, SheetSettings> = {
     characterLimit: null,
     glossaryOverride: '',
     instructions: '',
+    visibleLanguages: null,
   },
 }
 
@@ -99,6 +110,7 @@ export const mockSheetSettings: Record<string, SheetSettings> = {
     characterLimit: 30,
     glossaryOverride: null,
     instructions: 'Keep UI strings short and punchy.',
+    visibleLanguages: null,
   },
 }
 

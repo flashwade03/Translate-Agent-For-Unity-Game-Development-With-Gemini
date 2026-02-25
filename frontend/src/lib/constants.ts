@@ -12,4 +12,5 @@ export const QUERY_KEYS = {
   review: (projectId: string, sheetName: string) =>
     ['review', projectId, sheetName] as const,
   jobHistory: (projectId: string) => ['jobHistory', projectId] as const,
+  projectLanguages: (projectId: string) => ['projectLanguages', projectId] as const,
 } as const
