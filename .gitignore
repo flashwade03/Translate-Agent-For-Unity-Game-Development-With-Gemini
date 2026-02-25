@@ -36,3 +36,6 @@ integration-test-*.png
 
 # Playwright MCP
 .playwright-mcp/
+
+# Git worktrees
+.worktrees/
