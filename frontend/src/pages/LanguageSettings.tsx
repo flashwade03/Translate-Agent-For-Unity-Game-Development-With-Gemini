@@ -62,12 +62,6 @@ export default function LanguageSettings() {
     })
   }
 
-  // Estimate impact for delete dialog (mock: count from languages in sheets)
-  const estimateImpact = () => {
-    // In real usage the API returns this; for now show conservative estimates
-    return { sheets: 0, translations: 0 }
-  }
-
   if (isLoading) {
     return (
       <div className="flex justify-center py-20">
@@ -75,8 +69,6 @@ export default function LanguageSettings() {
       </div>
     )
   }
-
-  const impact = estimateImpact()
 
   return (
     <div>
@@ -240,8 +232,6 @@ export default function LanguageSettings() {
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           languageLabel={deleteTarget.label}
-          affectedSheets={impact.sheets}
-          affectedTranslations={impact.translations}
           isPending={deleteMutation.isPending}
         />
       )}

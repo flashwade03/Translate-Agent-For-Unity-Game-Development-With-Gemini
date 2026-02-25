@@ -6,8 +6,6 @@ interface DeleteProjectLanguageDialogProps {
   onClose: () => void
   onConfirm: () => void
   languageLabel: string
-  affectedSheets: number
-  affectedTranslations: number
   isPending: boolean
 }
 
@@ -16,39 +14,31 @@ export function DeleteProjectLanguageDialog({
   onClose,
   onConfirm,
   languageLabel,
-  affectedSheets,
-  affectedTranslations,
   isPending,
 }: DeleteProjectLanguageDialogProps) {
   return (
-    <Modal open={open} onClose={onClose} title={`Delete ${languageLabel}?`}>
+    <Modal open={open} onClose={onClose} title={`Delete ${languageLabel}?`} titleIcon="warning">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-[var(--muted-foreground)]">
+        <p className="text-sm text-text-muted">
           This will permanently remove the <strong>{languageLabel}</strong> column
-          from all sheets. This action cannot be undone.
+          from all sheets in this project. This action cannot be undone.
         </p>
 
-        {(affectedSheets > 0 || affectedTranslations > 0) && (
-          <div className="bg-red-50 border border-red-200 rounded-[var(--radius-md)] p-3 text-sm">
-            <p className="font-medium text-[var(--destructive)]">Impact:</p>
-            <ul className="mt-1 text-[var(--destructive)] list-disc list-inside">
-              <li>{affectedSheets} sheet{affectedSheets !== 1 ? 's' : ''} affected</li>
-              <li>{affectedTranslations} translation{affectedTranslations !== 1 ? 's' : ''} will be deleted</li>
-            </ul>
-          </div>
-        )}
+        <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius-sm)] p-3 flex items-center gap-2">
+          <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p className="text-sm text-amber-800">
+            All existing translations for this language will be permanently deleted.
+          </p>
+        </div>
 
         <div className="flex justify-end gap-2 mt-2">
           <Button variant="outline" size="sm" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={onConfirm}
-            disabled={isPending}
-            className="bg-[var(--destructive)] hover:bg-[var(--destructive)]/90 text-white"
-          >
-            {isPending ? 'Deleting...' : 'Delete'}
+          <Button variant="danger" size="sm" onClick={onConfirm} disabled={isPending}>
+            {isPending ? 'Deleting...' : 'Delete Language'}
           </Button>
         </div>
       </div>

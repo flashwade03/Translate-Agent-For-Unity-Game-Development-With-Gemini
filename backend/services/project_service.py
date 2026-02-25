@@ -1,3 +1,4 @@
+import shutil
 import yaml
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,6 +60,13 @@ class ProjectService:
             last_translated_at=None,
             created_at=now,
         )
+
+    def delete_project(self, project_id: str) -> bool:
+        project_dir = self.projects_dir / project_id
+        if not project_dir.exists():
+            return False
+        shutil.rmtree(project_dir)
+        return True
 
     def _count_sheets(self, project_id: str) -> int:
         sheets_dir = self.projects_dir / project_id / "sheets"

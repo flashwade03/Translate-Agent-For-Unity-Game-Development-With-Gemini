@@ -44,9 +44,13 @@ export function updateStyleGuide(projectId: string, guide: StyleGuide) {
 }
 
 // Review Report
-export function fetchReviewReport(projectId: string, sheetName: string) {
-  return api<ReviewReport | null>(
-    'GET',
-    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/review`,
-  )
+export async function fetchReviewReport(projectId: string, sheetName: string): Promise<ReviewReport | null> {
+  try {
+    return await api<ReviewReport>(
+      'GET',
+      `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/review`,
+    )
+  } catch {
+    return null
+  }
 }

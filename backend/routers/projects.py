@@ -22,3 +22,10 @@ async def get_project(project_id: str):
 @router.post("", response_model=Project, status_code=201)
 async def create_project(payload: CreateProjectPayload):
     return service.create_project(payload.name, payload.description)
+
+
+@router.delete("/{project_id}")
+async def delete_project(project_id: str):
+    if not service.delete_project(project_id):
+        raise HTTPException(404, f"Project '{project_id}' not found")
+    return {"ok": True}

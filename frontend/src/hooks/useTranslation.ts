@@ -65,12 +65,21 @@ export function useTranslation(projectId: string, sheetName: string) {
 
   // --- Polling fallback (mock mode OR WebSocket failure) ---
   const usePoll = USE_MOCK || wsFailed
-  const { data: polledJob } = useQuery({
+  const { data: polledJob, isError: pollError } = useQuery({
     queryKey: QUERY_KEYS.job(activeJob?.jobId ?? ''),
     queryFn: () => pollJob(activeJob!.jobId),
     enabled: usePoll && jobIsActive,
     refetchInterval: 1500,
+    retry: 1,
   })
+
+  // If polling fails (e.g., 404 after server restart), clear the stale job
+  useEffect(() => {
+    if (pollError && activeJob) {
+      setActiveJob(null)
+      setWsJob(null)
+    }
+  }, [pollError, activeJob])
 
   // Determine current job state: prefer WS data, fallback to polled, then activeJob
   const currentJob = (!USE_MOCK && !wsFailed && wsJob) ? wsJob : (polledJob ?? activeJob)

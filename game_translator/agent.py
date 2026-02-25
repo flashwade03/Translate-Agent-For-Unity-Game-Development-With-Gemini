@@ -8,7 +8,7 @@ from .tools.sheets import read_sheet, write_sheet
 from .prompts import ORCHESTRATOR_INSTRUCTION
 
 root_agent = Agent(
-    model="gemini-2.0-flash",
+    model="gemini-3-flash-preview",
     name="game_translator",
     description="Game translation orchestrator. Reads CSV sheets, coordinates translation and review.",
     instruction=ORCHESTRATOR_INSTRUCTION,
