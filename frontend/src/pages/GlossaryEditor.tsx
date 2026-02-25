@@ -6,6 +6,7 @@ import {
   useUpdateGlossaryEntry,
   useDeleteGlossaryEntry,
 } from '../hooks/useGlossary'
+import { useProjectLanguages } from '../hooks/useProjectLanguages'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
@@ -17,11 +18,14 @@ function AddTermModal({
   open,
   onClose,
   onAdd,
+  projectId,
 }: {
   open: boolean
   onClose: () => void
   onAdd: (entry: Omit<GlossaryEntry, 'id'>) => void
+  projectId: string
 }) {
+  const { data: projectLangs } = useProjectLanguages(projectId)
   const [source, setSource] = useState('')
   const [target, setTarget] = useState('')
   const [language, setLanguage] = useState('')
@@ -49,7 +53,19 @@ function AddTermModal({
       <div className="flex flex-col gap-4">
         <Input label="Source Term" value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g., Health Potion" required />
         <Input label="Target" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g., 回復ポーション" required />
-        <Input label="Language" value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="e.g., ja" required />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text">Language</label>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-border rounded-[var(--radius-sm)] outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent bg-white"
+          >
+            <option value="">Select a language...</option>
+            {(projectLangs ?? []).map((l) => (
+              <option key={l.code} value={l.code}>{l.label} ({l.code})</option>
+            ))}
+          </select>
+        </div>
         <Input label="Context" value={context} onChange={(e) => setContext(e.target.value)} placeholder="Optional context" />
         <div className="flex justify-end gap-2 mt-2">
           <Button variant="outline" size="sm" onClick={handleClose}>Cancel</Button>
@@ -96,6 +112,7 @@ function GlossaryRow({
           <div className="flex gap-1">
             <Button size="sm" onClick={handleSave}>Save</Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button size="sm" variant="ghost" onClick={() => onDelete(entry.id)} className="text-error">Delete</Button>
           </div>
         </td>
       </tr>
@@ -200,6 +217,7 @@ export default function GlossaryEditor() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdd={(entry) => addMutation.mutate(entry)}
+        projectId={projectId!}
       />
     </div>
   )
