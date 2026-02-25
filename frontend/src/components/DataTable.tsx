@@ -80,6 +80,9 @@ export function DataTable({ data, disabled, onCellSave, onDeleteLanguage, onAddL
                 >
                   <span className="inline-flex items-center gap-1.5">
                     {lang.label}
+                    {lang.isSource && (
+                      <span className="text-xs text-accent font-normal">(source)</span>
+                    )}
                     {!lang.isSource && onDeleteLanguage && (
                       <button
                         onClick={() => onDeleteLanguage(lang.code)}
