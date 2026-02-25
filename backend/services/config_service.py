@@ -2,7 +2,16 @@ import uuid
 import yaml
 from pathlib import Path
 from backend.models import (
-    SheetSettings, Glossary, GlossaryEntry, GlossaryEntryCreate, StyleGuide,
+    SheetSettings, SheetSettingsResponse,
+    Glossary, GlossaryEntry, GlossaryEntryCreate, StyleGuide,
+)
+
+_HARDCODED_DEFAULTS = SheetSettings(
+    source_language="en",
+    translation_style="",
+    character_limit=None,
+    glossary_override="",
+    instructions="",
 )
 
 PROJECTS_DIR = Path(__file__).parent.parent.parent / "projects"
@@ -12,37 +21,56 @@ class ConfigService:
     def __init__(self, projects_dir: Path = PROJECTS_DIR):
         self.projects_dir = projects_dir
 
-    # --- Sheet Settings ---
+    # --- helpers for config.yaml ---
 
-    def get_sheet_settings(self, project_id: str, sheet_name: str) -> SheetSettings:
-        path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.yaml"
+    def _read_config(self, project_id: str) -> dict:
+        path = self.projects_dir / project_id / "config.yaml"
         if not path.exists():
-            return SheetSettings(project_id=project_id, sheet_name=sheet_name)
+            return {}
         with open(path) as f:
-            data = yaml.safe_load(f) or {}
-        return SheetSettings(
-            project_id=project_id,
-            sheet_name=sheet_name,
-            source_language=data.get("source_language", "en"),
-            translation_style=data.get("translation_style", "casual"),
-            character_limit=data.get("character_limit"),
-            glossary_override=data.get("glossary_override", False),
-            instructions=data.get("instructions", ""),
-        )
+            return yaml.safe_load(f) or {}
 
-    def update_sheet_settings(self, project_id: str, sheet_name: str, settings: SheetSettings) -> SheetSettings:
-        path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.yaml"
+    def _write_config(self, project_id: str, data: dict) -> None:
+        path = self.projects_dir / project_id / "config.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
-        data = {
-            "source_language": settings.source_language,
-            "translation_style": settings.translation_style,
-            "character_limit": settings.character_limit,
-            "glossary_override": settings.glossary_override,
-            "instructions": settings.instructions,
-        }
         with open(path, "w") as f:
             yaml.dump(data, f)
-        return settings
+
+    # --- Sheet Settings ---
+
+    def get_project_defaults(self, project_id: str) -> SheetSettings:
+        cfg = self._read_config(project_id)
+        defaults_raw = cfg.get("defaults") or {}
+        return SheetSettings(
+            source_language=defaults_raw.get("source_language", _HARDCODED_DEFAULTS.source_language),
+            translation_style=defaults_raw.get("translation_style", _HARDCODED_DEFAULTS.translation_style),
+            character_limit=defaults_raw.get("character_limit", _HARDCODED_DEFAULTS.character_limit),
+            glossary_override=defaults_raw.get("glossary_override", _HARDCODED_DEFAULTS.glossary_override),
+            instructions=defaults_raw.get("instructions", _HARDCODED_DEFAULTS.instructions),
+        )
+
+    def get_sheet_settings(self, project_id: str, sheet_name: str) -> SheetSettingsResponse:
+        cfg = self._read_config(project_id)
+        sheet_raw = (cfg.get("sheet_settings") or {}).get(sheet_name) or {}
+        overrides = SheetSettings(**{k: v for k, v in sheet_raw.items() if k in SheetSettings.model_fields})
+        return SheetSettingsResponse(
+            project_id=project_id,
+            sheet_name=sheet_name,
+            settings=overrides,
+            project_defaults=self.get_project_defaults(project_id),
+        )
+
+    def update_sheet_settings(self, project_id: str, sheet_name: str, settings: SheetSettings) -> SheetSettingsResponse:
+        cfg = self._read_config(project_id)
+        sheet_settings_all = cfg.get("sheet_settings") or {}
+        overrides = {k: v for k, v in settings.model_dump().items() if v is not None and v != ""}
+        if overrides:
+            sheet_settings_all[sheet_name] = overrides
+        else:
+            sheet_settings_all.pop(sheet_name, None)
+        cfg["sheet_settings"] = sheet_settings_all
+        self._write_config(project_id, cfg)
+        return self.get_sheet_settings(project_id, sheet_name)
 
     # --- Glossary ---
 

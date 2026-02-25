@@ -180,13 +180,18 @@ class StyleGuide(_CamelModel):
 
 
 class SheetSettings(_CamelModel):
+    source_language: str | None = None
+    translation_style: str | None = None
+    character_limit: int | None = None
+    glossary_override: str | None = None
+    instructions: str | None = None
+
+
+class SheetSettingsResponse(_CamelModel):
     project_id: str
     sheet_name: str
-    source_language: str = "en"
-    translation_style: str = "casual"
-    character_limit: int | None = None
-    glossary_override: bool = False
-    instructions: str = ""
+    settings: SheetSettings
+    project_defaults: SheetSettings
 
 
 # ---------------------------------------------------------------------------

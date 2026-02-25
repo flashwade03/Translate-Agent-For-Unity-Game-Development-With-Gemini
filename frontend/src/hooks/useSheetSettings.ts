@@ -17,6 +17,7 @@ export function useUpdateSheetSettings(projectId: string, sheetName: string) {
     mutationFn: (settings: SheetSettings) => updateSheetSettings(projectId, sheetName, settings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sheetSettings(projectId, sheetName) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sheetData(projectId, sheetName) })
     },
   })
 }

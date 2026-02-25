@@ -1,16 +1,16 @@
 import { api } from './client'
-import type { SheetSettings, Glossary, GlossaryEntry, StyleGuide, ReviewReport } from '../types'
+import type { SheetSettings, SheetSettingsResponse, Glossary, GlossaryEntry, StyleGuide, ReviewReport } from '../types'
 
 // Sheet Settings
 export function fetchSheetSettings(projectId: string, sheetName: string) {
-  return api<SheetSettings>(
+  return api<SheetSettingsResponse>(
     'GET',
     `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/settings`,
   )
 }
 
 export function updateSheetSettings(projectId: string, sheetName: string, settings: SheetSettings) {
-  return api<SheetSettings>(
+  return api<SheetSettingsResponse>(
     'PUT',
     `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/settings`,
     settings,

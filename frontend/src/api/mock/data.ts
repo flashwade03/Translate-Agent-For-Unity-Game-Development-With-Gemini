@@ -2,6 +2,7 @@ import type {
   Project,
   SheetData,
   SheetSettings,
+  SheetSettingsResponse,
   Glossary,
   StyleGuide,
   ReviewReport,
@@ -81,14 +82,22 @@ export const mockSheetData: Record<string, SheetData> = {
   },
 }
 
+export const mockProjectDefaults: Record<string, SheetSettings> = {
+  opal_app: {
+    sourceLanguage: 'en',
+    translationStyle: '',
+    characterLimit: null,
+    glossaryOverride: '',
+    instructions: '',
+  },
+}
+
 export const mockSheetSettings: Record<string, SheetSettings> = {
   'opal_app/UI': {
-    projectId: 'opal_app',
-    sheetName: 'UI',
-    sourceLanguage: 'en',
+    sourceLanguage: null,
     translationStyle: 'casual',
     characterLimit: 30,
-    glossaryOverride: false,
+    glossaryOverride: null,
     instructions: 'Keep UI strings short and punchy.',
   },
 }

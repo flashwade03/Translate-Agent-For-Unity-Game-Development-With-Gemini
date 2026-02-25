@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from backend.models import (
-    SheetSettings, Glossary, GlossaryEntry, GlossaryEntryCreate, StyleGuide,
+    SheetSettings, SheetSettingsResponse,
+    Glossary, GlossaryEntry, GlossaryEntryCreate, StyleGuide,
 )
 from backend.services.config_service import ConfigService
 
@@ -10,12 +11,12 @@ service = ConfigService()
 
 # --- Sheet Settings ---
 
-@router.get("/sheets/{sheet_name}/settings", response_model=SheetSettings)
+@router.get("/sheets/{sheet_name}/settings", response_model=SheetSettingsResponse)
 async def get_sheet_settings(project_id: str, sheet_name: str):
     return service.get_sheet_settings(project_id, sheet_name)
 
 
-@router.put("/sheets/{sheet_name}/settings", response_model=SheetSettings)
+@router.put("/sheets/{sheet_name}/settings", response_model=SheetSettingsResponse)
 async def update_sheet_settings(project_id: str, sheet_name: str, settings: SheetSettings):
     return service.update_sheet_settings(project_id, sheet_name, settings)
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useSheetData, useAddRow, useDeleteRows } from '../hooks/useSheets'
 import { useTranslation } from '../hooks/useTranslation'
@@ -11,18 +11,19 @@ import { JobStatusBanner } from '../components/JobStatusBanner'
 import { AddLanguageModal } from '../components/AddLanguageModal'
 import { DeleteLanguageDialog } from '../components/DeleteLanguageDialog'
 import { DeleteRowsDialog } from '../components/DeleteRowsDialog'
+import { SheetSettingsDialog } from '../components/SheetSettingsDialog'
 import { Button } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
 
 export default function SheetViewer() {
   const { projectId, sheetName } = useParams<{ projectId: string; sheetName: string }>()
-  const navigate = useNavigate()
   const { data, isLoading, error } = useSheetData(projectId!, sheetName!)
   const { job, isRunning, trigger, dismiss } = useTranslation(projectId!, sheetName!)
   const { addMutation, deleteMutation } = useLanguages(projectId!, sheetName!)
   const addRowMutation = useAddRow(projectId!, sheetName!)
   const deleteRowsMutation = useDeleteRows(projectId!, sheetName!)
 
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; label: string } | null>(null)
   const [deleteTranslationCount, setDeleteTranslationCount] = useState(0)
@@ -102,9 +103,7 @@ export default function SheetViewer() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                navigate(`/projects/${projectId}/sheets/${encodeURIComponent(sheetName!)}/settings`)
-              }
+              onClick={() => setSettingsOpen(true)}
             >
               Settings
             </Button>
@@ -168,6 +167,13 @@ export default function SheetViewer() {
         onClose={() => setPendingDeleteKeys([])}
         onConfirm={handleConfirmDeleteRows}
         count={pendingDeleteKeys.length}
+      />
+
+      <SheetSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        projectId={projectId!}
+        sheetName={sheetName!}
       />
     </div>
   )

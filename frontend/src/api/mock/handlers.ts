@@ -2,6 +2,7 @@ import {
   mockProjects,
   mockSheetNames,
   mockSheetData,
+  mockProjectDefaults,
   mockSheetSettings,
   mockGlossary,
   mockStyleGuide,
@@ -10,7 +11,7 @@ import {
   createMockJob,
   pollMockJob,
 } from './data'
-import type { CreateProjectPayload, SheetSettings, GlossaryEntry, StyleGuide } from '../../types'
+import type { CreateProjectPayload, SheetSettings, SheetSettingsResponse, GlossaryEntry, StyleGuide } from '../../types'
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
@@ -158,20 +159,36 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
   params = match('/api/projects/:projectId/sheets/:sheetName/settings', path)
   if (params) {
     const key = `${params.projectId}/${params.sheetName}`
+    const defaults: SheetSettings = mockProjectDefaults[params.projectId] || {
+      sourceLanguage: 'en',
+      translationStyle: '',
+      characterLimit: null,
+      glossaryOverride: '',
+      instructions: '',
+    }
     if (method === 'GET') {
-      return mockSheetSettings[key] || {
+      const settings: SheetSettings = mockSheetSettings[key] || {
+        sourceLanguage: null,
+        translationStyle: null,
+        characterLimit: null,
+        glossaryOverride: null,
+        instructions: null,
+      }
+      return {
         projectId: params.projectId,
         sheetName: params.sheetName,
-        sourceLanguage: 'en',
-        translationStyle: 'casual',
-        characterLimit: null,
-        glossaryOverride: false,
-        instructions: '',
-      }
+        settings,
+        projectDefaults: defaults,
+      } satisfies SheetSettingsResponse
     }
     if (method === 'PUT') {
       mockSheetSettings[key] = body as SheetSettings
-      return mockSheetSettings[key]
+      return {
+        projectId: params.projectId,
+        sheetName: params.sheetName,
+        settings: mockSheetSettings[key],
+        projectDefaults: defaults,
+      } satisfies SheetSettingsResponse
     }
   }
 

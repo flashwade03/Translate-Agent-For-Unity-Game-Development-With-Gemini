@@ -6,7 +6,6 @@ import { useSheetNames } from './hooks/useSheets'
 
 const ProjectList = lazy(() => import('./pages/ProjectList'))
 const SheetViewer = lazy(() => import('./pages/SheetViewer'))
-const SheetSettings = lazy(() => import('./pages/SheetSettings'))
 const GlossaryEditor = lazy(() => import('./pages/GlossaryEditor'))
 const StyleGuideEditor = lazy(() => import('./pages/StyleGuideEditor'))
 const ReviewReport = lazy(() => import('./pages/ReviewReport'))
@@ -39,7 +38,6 @@ export default function App() {
         <Route path="/projects/:projectId" element={<ProjectLayout />}>
           <Route index element={<ProjectIndex />} />
           <Route path="sheets/:sheetName" element={<SheetViewer />} />
-          <Route path="sheets/:sheetName/settings" element={<SheetSettings />} />
           <Route path="glossary" element={<GlossaryEditor />} />
           <Route path="style-guide" element={<StyleGuideEditor />} />
           <Route path="reports" element={<ReviewReport />} />
