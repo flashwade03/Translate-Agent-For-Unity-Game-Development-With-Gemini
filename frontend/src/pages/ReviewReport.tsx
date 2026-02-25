@@ -5,10 +5,12 @@ import { fetchReviewReport } from '../api/config'
 import { QUERY_KEYS } from '../lib/constants'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Spinner } from '../components/ui/Spinner'
 import { useSheetNames } from '../hooks/useSheets'
-import type { IssueCategory, IssueSeverity, ReviewStats } from '../types'
+import { useTranslation } from '../hooks/useTranslation'
+import type { IssueCategory, IssueSeverity } from '../types'
 
 const severityVariant: Record<IssueSeverity, 'error' | 'warning' | 'info'> = {
   error: 'error',
@@ -39,27 +41,35 @@ export default function ReviewReport() {
     enabled: !!projectId && !!sheetName,
   })
 
-  const [severityFilter, setSeverityFilter] = useState<IssueSeverity | null>(null)
-  const [categoryFilter, setCategoryFilter] = useState<IssueCategory | null>(null)
+  const { trigger, isRunning } = useTranslation(projectId!, sheetName)
 
-  const stats: ReviewStats = useMemo(() => {
-    if (!report) return { total: 0, errors: 0, warnings: 0, info: 0 }
+  const [activeFilter, setActiveFilter] = useState<string | null>(null)
+
+  const stats = useMemo(() => {
+    if (!report) return { totalKeys: 0, issuesFound: 0, passed: 0 }
+    const issuesFound = report.issues.length
+    const totalKeys = issuesFound + (report.totalKeys ?? issuesFound)
     return {
-      total: report.issues.length,
-      errors: report.issues.filter((i) => i.severity === 'error').length,
-      warnings: report.issues.filter((i) => i.severity === 'warning').length,
-      info: report.issues.filter((i) => i.severity === 'info').length,
+      totalKeys: report.totalKeys ?? totalKeys,
+      issuesFound,
+      passed: (report.totalKeys ?? totalKeys) - issuesFound,
     }
   }, [report])
 
   const filteredIssues = useMemo(() => {
     if (!report) return []
-    return report.issues.filter((issue) => {
-      if (severityFilter && issue.severity !== severityFilter) return false
-      if (categoryFilter && issue.category !== categoryFilter) return false
-      return true
-    })
-  }, [report, severityFilter, categoryFilter])
+    if (!activeFilter) return report.issues
+    return report.issues.filter(
+      (issue) => issue.category === activeFilter || issue.severity === activeFilter,
+    )
+  }, [report, activeFilter])
+
+  // Collect unique categories from issues for filter tabs
+  const filterTabs = useMemo(() => {
+    if (!report) return []
+    const cats = new Set(report.issues.map((i) => i.category))
+    return Array.from(cats)
+  }, [report])
 
   if (isLoading) {
     return (
@@ -71,7 +81,20 @@ export default function ReviewReport() {
 
   return (
     <div>
-      <PageHeader title="Review Report" />
+      <PageHeader
+        title={`Review Report${sheetName ? ` — ${sheetName}` : ''}`}
+        description={report?.lastReviewedAt ? `Last reviewed: ${new Date(report.lastReviewedAt).toLocaleString()}` : undefined}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isRunning || !sheetName}
+            onClick={() => trigger('review')}
+          >
+            Re-run Review
+          </Button>
+        }
+      />
 
       {/* Sheet selector */}
       {sheets && sheets.length > 1 && (
@@ -95,49 +118,39 @@ export default function ReviewReport() {
         </div>
       ) : (
         <>
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {/* Stat cards — 3 cards matching Pencil */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
             <Card>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-text-muted">Total Issues</div>
+              <div className="text-2xl font-bold">{stats.totalKeys}</div>
+              <div className="text-xs text-text-muted">Total Keys</div>
             </Card>
             <Card>
-              <div className="text-2xl font-bold text-error">{stats.errors}</div>
-              <div className="text-xs text-text-muted">Errors</div>
+              <div className="text-2xl font-bold text-error">{stats.issuesFound}</div>
+              <div className="text-xs text-text-muted">Issues Found</div>
             </Card>
             <Card>
-              <div className="text-2xl font-bold text-warning">{stats.warnings}</div>
-              <div className="text-xs text-text-muted">Warnings</div>
-            </Card>
-            <Card>
-              <div className="text-2xl font-bold text-accent">{stats.info}</div>
-              <div className="text-xs text-text-muted">Info</div>
+              <div className="text-2xl font-bold text-success">{stats.passed}</div>
+              <div className="text-xs text-text-muted">Passed</div>
             </Card>
           </div>
 
-          {/* Filter badges */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className="text-xs text-text-muted self-center mr-1">Severity:</span>
-            {(['error', 'warning', 'info'] as IssueSeverity[]).map((s) => (
+          {/* Filter tabs */}
+          <div className="flex gap-2 mb-4">
+            <Badge
+              variant="default"
+              active={activeFilter === null}
+              onClick={() => setActiveFilter(null)}
+            >
+              All
+            </Badge>
+            {filterTabs.map((cat) => (
               <Badge
-                key={s}
-                variant={severityVariant[s]}
-                active={severityFilter === s}
-                onClick={() => setSeverityFilter(severityFilter === s ? null : s)}
-              >
-                {s}
-              </Badge>
-            ))}
-
-            <span className="text-xs text-text-muted self-center ml-3 mr-1">Category:</span>
-            {(Object.keys(categoryLabels) as IssueCategory[]).map((c) => (
-              <Badge
-                key={c}
+                key={cat}
                 variant="default"
-                active={categoryFilter === c}
-                onClick={() => setCategoryFilter(categoryFilter === c ? null : c)}
+                active={activeFilter === cat}
+                onClick={() => setActiveFilter(activeFilter === cat ? null : cat)}
               >
-                {categoryLabels[c]}
+                {categoryLabels[cat as IssueCategory] ?? cat}
               </Badge>
             ))}
           </div>

@@ -91,7 +91,7 @@ export default function JobHistory() {
 
   return (
     <div>
-      <PageHeader title="Job History" description="Past translation and review jobs" />
+      <PageHeader title="Job History" description="View past translation, update, and review jobs." />
 
       {!jobs || jobs.length === 0 ? (
         <div className="text-center text-text-muted py-16">

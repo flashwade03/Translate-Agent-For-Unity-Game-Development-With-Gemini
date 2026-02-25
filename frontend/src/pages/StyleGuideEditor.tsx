@@ -47,57 +47,63 @@ export default function StyleGuideEditor() {
 
   return (
     <div className="max-w-lg">
-      <PageHeader title="Style Guide" description="Define the translation tone and style for this project." />
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input
-          label="Tone"
-          value={form.tone}
-          onChange={(e) => setForm({ ...form, tone: e.target.value })}
-          placeholder="e.g., Friendly and encouraging"
+      <form onSubmit={handleSubmit}>
+        <PageHeader
+          title="Style Guide"
+          description="Define the translation tone and style for this project."
+          actions={
+            <div className="flex items-center gap-3">
+              {saved && <span className="text-sm text-success">Saved!</span>}
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          }
         />
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text">Formality</label>
-          <select
-            value={form.formality}
-            onChange={(e) => setForm({ ...form, formality: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-border rounded-[var(--radius-sm)] outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent bg-white"
-          >
-            <option value="casual">Casual</option>
-            <option value="neutral">Neutral</option>
-            <option value="formal">Formal</option>
-          </select>
-        </div>
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Tone"
+            value={form.tone}
+            onChange={(e) => setForm({ ...form, tone: e.target.value })}
+            placeholder="e.g., Friendly and encouraging"
+          />
 
-        <Input
-          label="Target Audience"
-          value={form.audience}
-          onChange={(e) => setForm({ ...form, audience: e.target.value })}
-          placeholder="e.g., Young adults (18-30)"
-        />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text">Formality Level</label>
+            <select
+              value={form.formality}
+              onChange={(e) => setForm({ ...form, formality: e.target.value })}
+              className="w-full px-3 py-2 text-sm border border-border rounded-[var(--radius-sm)] outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent bg-white"
+            >
+              <option value="casual">Casual</option>
+              <option value="neutral">Neutral</option>
+              <option value="formal">Formal</option>
+            </select>
+          </div>
 
-        <Textarea
-          label="Translation Rules"
-          value={form.rules}
-          onChange={(e) => setForm({ ...form, rules: e.target.value })}
-          placeholder="- Use simple language&#10;- Keep exclamations for achievements"
-          rows={6}
-        />
+          <Input
+            label="Target Audience"
+            value={form.audience}
+            onChange={(e) => setForm({ ...form, audience: e.target.value })}
+            placeholder="e.g., Young adults (18-30)"
+          />
 
-        <Textarea
-          label="Examples"
-          value={form.examples}
-          onChange={(e) => setForm({ ...form, examples: e.target.value })}
-          placeholder='Good: "Awesome job!"&#10;Bad: "Your performance metrics..."'
-          rows={4}
-        />
+          <Textarea
+            label="Translation Notes"
+            value={form.rules}
+            onChange={(e) => setForm({ ...form, rules: e.target.value })}
+            placeholder="- Use simple language&#10;- Keep exclamations for achievements"
+            rows={6}
+          />
 
-        <div className="flex items-center gap-3 mt-2">
-          <Button type="submit" disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? 'Saving...' : 'Save Style Guide'}
-          </Button>
-          {saved && <span className="text-sm text-success">Saved!</span>}
+          <Textarea
+            label="Style Examples"
+            value={form.examples}
+            onChange={(e) => setForm({ ...form, examples: e.target.value })}
+            placeholder='Good: "Awesome job!"&#10;Bad: "Your performance metrics..."'
+            rows={4}
+          />
         </div>
       </form>
     </div>

@@ -35,6 +35,7 @@ export function AddLanguageModal({ open, onClose, onConfirm, projectId, existing
   return (
     <Modal open={open} onClose={handleClose} title="Add Language">
       <div className="flex flex-col gap-4">
+        <p className="text-sm text-text-muted">Add a new translation language to this sheet.</p>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-text">Language</label>
           <div className="relative">

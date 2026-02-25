@@ -13,12 +13,13 @@ export default function ProjectList() {
     <div className="min-h-screen bg-bg-muted">
       <header className="bg-white border-b border-border">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Game Translation Agent</h1>
-          <Button onClick={() => setShowCreate(true)}>+ New Project</Button>
+          <h1 className="text-xl font-bold">Game Translator</h1>
+          <Button onClick={() => setShowCreate(true)}>New Project</Button>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+        <p className="text-sm text-text-muted mb-6">Select a project to manage translations</p>
         {isLoading && (
           <div className="flex justify-center py-20">
             <Spinner />

@@ -122,11 +122,19 @@ export default function SheetViewer() {
         actions={
           <div className="flex gap-2">
             <Button
+              size="sm"
+              disabled={isRunning}
+              onClick={() => trigger('translate_all')}
+            >
+              Translate All
+            </Button>
+            <Button
               variant="outline"
               size="sm"
-              onClick={() => setSettingsOpen(true)}
+              disabled={isRunning}
+              onClick={() => trigger('update')}
             >
-              Settings
+              Update
             </Button>
             <Button
               variant="outline"
@@ -139,17 +147,9 @@ export default function SheetViewer() {
             <Button
               variant="outline"
               size="sm"
-              disabled={isRunning}
-              onClick={() => trigger('update')}
+              onClick={() => setSettingsOpen(true)}
             >
-              Update
-            </Button>
-            <Button
-              size="sm"
-              disabled={isRunning}
-              onClick={() => trigger('translate_all')}
-            >
-              Translate All
+              Settings
             </Button>
           </div>
         }
@@ -183,6 +183,7 @@ export default function SheetViewer() {
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           languageLabel={deleteTarget.label}
+          languageCode={deleteTarget.code}
           translationCount={deleteTranslationCount}
         />
       )}

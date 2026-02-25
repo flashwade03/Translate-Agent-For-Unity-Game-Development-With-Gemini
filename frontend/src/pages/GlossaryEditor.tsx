@@ -9,40 +9,54 @@ import {
 import { PageHeader } from '../components/layout/PageHeader'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { Modal } from '../components/ui/Modal'
 import { Spinner } from '../components/ui/Spinner'
 import type { GlossaryEntry } from '../types'
 
-function AddEntryForm({ onAdd }: { onAdd: (entry: Omit<GlossaryEntry, 'id'>) => void }) {
+function AddTermModal({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (entry: Omit<GlossaryEntry, 'id'>) => void
+}) {
   const [source, setSource] = useState('')
   const [target, setTarget] = useState('')
   const [language, setLanguage] = useState('')
   const [context, setContext] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = () => {
     if (!source || !target || !language) return
     onAdd({ source, target, language, context: context || undefined })
     setSource('')
     setTarget('')
     setContext('')
+    onClose()
+  }
+
+  const handleClose = () => {
+    setSource('')
+    setTarget('')
+    setLanguage('')
+    setContext('')
+    onClose()
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2 mb-4 flex-wrap">
-      <div className="flex-1 min-w-[120px]">
-        <Input label="Source" value={source} onChange={(e) => setSource(e.target.value)} placeholder="Level Up" required />
+    <Modal open={open} onClose={handleClose} title="Add Term">
+      <div className="flex flex-col gap-4">
+        <Input label="Source Term" value={source} onChange={(e) => setSource(e.target.value)} placeholder="e.g., Health Potion" required />
+        <Input label="Target" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="e.g., 回復ポーション" required />
+        <Input label="Language" value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="e.g., ja" required />
+        <Input label="Context" value={context} onChange={(e) => setContext(e.target.value)} placeholder="Optional context" />
+        <div className="flex justify-end gap-2 mt-2">
+          <Button variant="outline" size="sm" onClick={handleClose}>Cancel</Button>
+          <Button size="sm" onClick={handleSubmit} disabled={!source || !target || !language}>Add Term</Button>
+        </div>
       </div>
-      <div className="flex-1 min-w-[120px]">
-        <Input label="Target" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="レベルアップ" required />
-      </div>
-      <div className="w-20">
-        <Input label="Lang" value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="ja" required />
-      </div>
-      <div className="flex-1 min-w-[120px]">
-        <Input label="Context" value={context} onChange={(e) => setContext(e.target.value)} placeholder="Optional" />
-      </div>
-      <Button type="submit" size="sm">Add</Button>
-    </form>
+    </Modal>
   )
 }
 
@@ -95,10 +109,12 @@ function GlossaryRow({
       <td className="px-3 py-2 text-sm text-text-muted">{entry.language}</td>
       <td className="px-3 py-2 text-sm text-text-muted">{entry.context || '-'}</td>
       <td className="px-3 py-2">
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Edit</Button>
-          <Button size="sm" variant="ghost" onClick={() => onDelete(entry.id)} className="text-error">Delete</Button>
-        </div>
+        <button
+          onClick={() => setEditing(true)}
+          className="text-sm text-accent hover:text-accent/80 cursor-pointer font-medium"
+        >
+          Edit
+        </button>
       </td>
     </tr>
   )
@@ -111,6 +127,7 @@ export default function GlossaryEditor() {
   const updateMutation = useUpdateGlossaryEntry(projectId!)
   const deleteMutation = useDeleteGlossaryEntry(projectId!)
   const [search, setSearch] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
 
   if (isLoading) {
     return (
@@ -133,14 +150,16 @@ export default function GlossaryEditor() {
     <div>
       <PageHeader
         title="Glossary"
-        description={`${entries.length} entries`}
+        actions={
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            Add Term
+          </Button>
+        }
       />
-
-      <AddEntryForm onAdd={(entry) => addMutation.mutate(entry)} />
 
       <div className="mb-3">
         <Input
-          placeholder="Search glossary..."
+          placeholder="Search terms..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -150,11 +169,11 @@ export default function GlossaryEditor() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-bg-muted">
-              <th className="text-left px-3 py-2 font-medium text-text-muted">Source</th>
-              <th className="text-left px-3 py-2 font-medium text-text-muted">Target</th>
+              <th className="text-left px-3 py-2 font-medium text-text-muted">Source Term</th>
+              <th className="text-left px-3 py-2 font-medium text-text-muted">Translation</th>
               <th className="text-left px-3 py-2 font-medium text-text-muted">Lang</th>
               <th className="text-left px-3 py-2 font-medium text-text-muted">Context</th>
-              <th className="text-left px-3 py-2 font-medium text-text-muted w-32">Actions</th>
+              <th className="text-left px-3 py-2 font-medium text-text-muted w-20">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -176,6 +195,12 @@ export default function GlossaryEditor() {
           </tbody>
         </table>
       </div>
+
+      <AddTermModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdd={(entry) => addMutation.mutate(entry)}
+      />
     </div>
   )
 }
