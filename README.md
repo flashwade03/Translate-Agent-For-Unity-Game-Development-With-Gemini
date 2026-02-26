@@ -6,6 +6,10 @@
   <img src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind" />
 </p>
 
+<p align="center">
+  <strong>English</strong> | <a href="README.ko.md">한국어</a> | <a href="README.ja.md">日本語</a>
+</p>
+
 # Game Translation Agent
 
 AI-powered multi-agent game localization system. Translate, review, and manage game text across languages — all from a single dashboard.
