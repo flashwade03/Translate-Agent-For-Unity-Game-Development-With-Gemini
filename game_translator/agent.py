@@ -1,3 +1,5 @@
+import os
+
 from google.adk.agents import Agent
 
 from .sub_agents.translator import translator_agent
@@ -7,8 +9,10 @@ from .tools.glossary import get_glossary, get_style_guide
 from .tools.sheets import read_sheet, write_sheet
 from .prompts import ORCHESTRATOR_INSTRUCTION
 
+_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+
 root_agent = Agent(
-    model="gemini-3-flash-preview",
+    model=_MODEL,
     name="game_translator",
     description="Game translation orchestrator. Reads CSV sheets, coordinates translation and review.",
     instruction=ORCHESTRATOR_INSTRUCTION,
