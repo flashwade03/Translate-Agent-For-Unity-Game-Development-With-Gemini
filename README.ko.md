@@ -106,6 +106,8 @@ cp .env.example .env
 ```env
 GOOGLE_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-3-flash-preview
+BACKEND_PORT=8000
+FRONTEND_PORT=5173
 ```
 
 ### 3. 실행

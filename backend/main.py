@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -5,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
+
+FRONTEND_PORT = os.environ.get("FRONTEND_PORT", "5173")
 
 
 @asynccontextmanager
@@ -49,7 +52,7 @@ app = FastAPI(title="Game Translator API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[f"http://localhost:{FRONTEND_PORT}"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
