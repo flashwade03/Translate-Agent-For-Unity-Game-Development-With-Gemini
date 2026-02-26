@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Request
-from backend.models import SheetData, RowUpdate, AddLanguagePayload, CreateSheetPayload, AddRowPayload, DeleteRowsPayload
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import FileResponse
+from backend.models import SheetData, RowUpdate, AddLanguagePayload, CreateSheetPayload, AddRowPayload, DeleteRowsPayload, CsvUploadResult
 from backend.services.project_service import ProjectService
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["sheets"])
@@ -64,6 +65,22 @@ async def get_sheet_data(project_id: str, sheet_name: str, request: Request):
     return data
 
 
+@router.get("/sheets/{sheet_name}/export")
+async def export_sheet(project_id: str, sheet_name: str, request: Request):
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    sheets_svc = request.app.state.sheets_service
+    csv_path = sheets_svc.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+    if not csv_path.exists():
+        raise HTTPException(404, "Sheet not found")
+    return FileResponse(
+        path=str(csv_path),
+        media_type="text/csv",
+        filename=f"{sheet_name}.csv",
+    )
+
+
 @router.put("/sheets/{sheet_name}/rows")
 async def update_rows(project_id: str, sheet_name: str, updates: list[RowUpdate], request: Request):
     project = project_service.get_project(project_id)
@@ -109,6 +126,36 @@ async def delete_rows(project_id: str, sheet_name: str, payload: DeleteRowsPaylo
     sheets_svc = request.app.state.sheets_service
     deleted = sheets_svc.delete_rows(project_id, sheet_name, payload.keys)
     return {"ok": True, "deletedCount": deleted}
+
+
+@router.post("/sheets/{sheet_name}/upload", response_model=CsvUploadResult)
+async def upload_csv(
+    project_id: str,
+    sheet_name: str,
+    request: Request,
+    file: UploadFile = File(...),
+):
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    sheets_svc = request.app.state.sheets_service
+    config_svc = request.app.state.config_service
+
+    content = await file.read()
+    try:
+        csv_content = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "File must be UTF-8 encoded")
+
+    try:
+        result = sheets_svc.merge_csv(
+            project_id, sheet_name, csv_content, config_service=config_svc
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return result
 
 
 @router.post("/sheets/{sheet_name}/languages", status_code=201)

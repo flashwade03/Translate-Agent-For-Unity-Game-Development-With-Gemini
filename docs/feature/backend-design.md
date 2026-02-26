@@ -153,11 +153,36 @@ sequenceDiagram
 ### Scope (v1)
 
 **In scope**: WebSocket 진행률, Job SQLite 영속화 + 이력 조회 API
-**Out of scope**: 인증, 멀티 유저, 동시 작업 제한, CSV 업로드
+**Out of scope**: 인증, 멀티 유저, 동시 작업 제한
 
-## v1 이후 검토 방향 (확정 아님 — v1 사용 경험 후 결정)
+---
+
+## v2 Additions
+
+### Goal
+
+CSV 파일 업로드로 외부 번역 데이터를 기존 시트에 머지한다.
+
+### Architectural Decisions (v2)
+
+- **CSV 업로드는 key 기준 머지** — because 기존 시트에 새 key 추가 + 기존 key의 번역값 갱신이 가장 자연스러운 워크플로우. 전체 교체보다 데이터 손실 위험 적음.
+- **업로드 데이터가 기존 값을 무조건 덮어씀** — because 업로드하는 CSV가 최신 번역이라는 사용자 의도가 명확. "빈 셀만 채우기" 옵션은 불필요한 복잡도.
+- **Unity CSV 포맷만 허용** — because 시스템 전체가 Unity Localization 포맷을 기준으로 동작하므로, 업로드도 동일 포맷 강제. 컬럼 매핑 UI 불필요.
+- **업로드 CSV에 프로젝트 미등록 언어가 있으면 자동 추가** — because 외부에서 새 언어 번역을 가져오는 것이 자연스러운 사용 패턴. 거부하면 사용자가 수동으로 언어 추가 후 재업로드해야 하는 불편.
+
+### Constraints (v2 추가)
+
+- Must: 업로드 CSV의 Key 열이 없으면 거부
+- Must: 업로드 CSV가 Unity 포맷(`Label(locale)` 헤더)이 아니면 거부
+- Must: 자동 추가된 언어를 응답에 포함하여 사용자에게 알림
+
+### Scope (v2)
+
+**In scope**: CSV 파일 업로드 + key 머지 + 미등록 언어 자동 추가
+**Out of scope**: 비-Unity 포맷 지원, 컬럼 매핑 UI, Google Sheets 연동
+
+## v2 이후 검토 방향 (확정 아님 — v2 사용 경험 후 결정)
 
 - 사용자 인증 (Google OAuth)
 - 동시 작업 제한 / 큐 관리
-- CSV 파일 업로드 API
 - Google Sheets 연동 (선택적)

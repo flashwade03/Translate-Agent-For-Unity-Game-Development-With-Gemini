@@ -2,7 +2,9 @@ import csv
 import re
 from pathlib import Path
 
-from backend.models import SheetData, Language
+from io import StringIO
+
+from backend.models import SheetData, Language, CsvUploadResult, ProjectLanguage
 
 PROJECTS_DIR = Path(__file__).parent.parent.parent / "projects"
 
@@ -277,6 +279,138 @@ class SheetsService:
             writer.writerow(headers)
 
         return True
+
+    def merge_csv(
+        self,
+        project_id: str,
+        sheet_name: str,
+        csv_content: str,
+        config_service=None,
+    ) -> CsvUploadResult:
+        """Merge uploaded CSV into an existing sheet by key.
+
+        - Existing keys: overwrite all values from upload
+        - New keys: append rows
+        - New languages in upload: add columns to this sheet + project config
+        Returns merge statistics.
+        Raises ValueError if CSV format is invalid.
+        """
+        # Parse uploaded CSV
+        reader = csv.reader(StringIO(csv_content))
+        upload_headers = next(reader, None)
+        if not upload_headers:
+            raise ValueError("Empty CSV file")
+
+        # Validate Unity format: first column must be "Key" (case-insensitive)
+        if upload_headers[0].strip().lower() != "key":
+            raise ValueError("First column must be 'Key'")
+
+        # Parse upload language headers
+        upload_langs: list[tuple[str, str]] = []  # (code, header_str)
+        for h in upload_headers[1:]:
+            m = re.match(r"(.+)\(([^)]+)\)", h.strip())
+            if not m:
+                raise ValueError(f"Invalid header format: '{h}'. Expected 'Label(locale)'")
+            upload_langs.append((m.group(2), h.strip()))
+
+        upload_rows = list(reader)
+
+        # Read existing sheet
+        csv_path = self.projects_dir / project_id / "sheets" / f"{sheet_name}.csv"
+        if not csv_path.exists():
+            raise ValueError(f"Sheet '{sheet_name}' not found")
+
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            existing_reader = csv.reader(f)
+            existing_headers = next(existing_reader, None) or ["Key"]
+            existing_rows = list(existing_reader)
+
+        # Build existing language code -> column index map
+        existing_col_index: dict[str, int] = {}
+        for i, h in enumerate(existing_headers[1:], start=1):
+            m = re.match(r".+\(([^)]+)\)", h)
+            if m:
+                existing_col_index[m.group(1)] = i
+
+        # Detect new languages and add columns
+        added_languages: list[ProjectLanguage] = []
+        upload_col_map: list[int] = []  # upload lang index -> existing col index
+
+        for code, header_str in upload_langs:
+            if code in existing_col_index:
+                upload_col_map.append(existing_col_index[code])
+            else:
+                # New language column — append to headers
+                new_idx = len(existing_headers)
+                existing_headers.append(header_str)
+                existing_col_index[code] = new_idx
+                upload_col_map.append(new_idx)
+                # Extend existing rows with empty cells
+                for row in existing_rows:
+                    row.append("")
+
+                # Parse label from header
+                m = re.match(r"(.+)\(([^)]+)\)", header_str)
+                label = m.group(1) if m else code
+                added_languages.append(ProjectLanguage(code=code, label=label))
+
+        # Auto-add new languages to project config + other sheets
+        if config_service and added_languages:
+            for lang in added_languages:
+                config_service.add_project_language(project_id, lang.code, lang.label)
+            # Add columns to other sheets
+            other_sheets = self.list_sheets(project_id)
+            for other in other_sheets:
+                if other != sheet_name:
+                    for lang in added_languages:
+                        self.add_language(project_id, other, lang.code, lang.label)
+
+        # Build existing key -> row index map
+        existing_key_index: dict[str, int] = {}
+        for i, row in enumerate(existing_rows):
+            if row:
+                existing_key_index[row[0]] = i
+
+        # Merge rows
+        added_keys = 0
+        updated_keys = 0
+        num_cols = len(existing_headers)
+
+        for upload_row in upload_rows:
+            if not upload_row:
+                continue
+            key = upload_row[0]
+            if key in existing_key_index:
+                # Overwrite existing row values
+                row_idx = existing_key_index[key]
+                for ul_idx, col_idx in enumerate(upload_col_map):
+                    value = upload_row[ul_idx + 1] if ul_idx + 1 < len(upload_row) else ""
+                    while len(existing_rows[row_idx]) <= col_idx:
+                        existing_rows[row_idx].append("")
+                    existing_rows[row_idx][col_idx] = value
+                updated_keys += 1
+            else:
+                # New key — append row
+                new_row = [""] * num_cols
+                new_row[0] = key
+                for ul_idx, col_idx in enumerate(upload_col_map):
+                    value = upload_row[ul_idx + 1] if ul_idx + 1 < len(upload_row) else ""
+                    new_row[col_idx] = value
+                existing_rows.append(new_row)
+                existing_key_index[key] = len(existing_rows) - 1
+                added_keys += 1
+
+        # Write back
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(existing_headers)
+            writer.writerows(existing_rows)
+
+        return CsvUploadResult(
+            added_keys=added_keys,
+            updated_keys=updated_keys,
+            added_languages=added_languages,
+        )
 
     def delete_sheet(self, project_id: str, sheet_name: str) -> int:
         """Delete a CSV sheet. Returns the number of rows (keys) that were deleted, or -1 if not found."""

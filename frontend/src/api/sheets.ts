@@ -1,5 +1,5 @@
-import { api } from './client'
-import type { SheetData } from '../types'
+import { api, apiUpload } from './client'
+import type { SheetData, CsvUploadResult } from '../types'
 
 export function fetchSheetNames(projectId: string) {
   return api<string[]>('GET', `/api/projects/${projectId}/sheets`)
@@ -73,5 +73,16 @@ export function deleteRows(projectId: string, sheetName: string, keys: string[])
     'DELETE',
     `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/rows`,
     { keys },
+  )
+}
+
+export function exportCsvUrl(projectId: string, sheetName: string) {
+  return `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/export`
+}
+
+export function uploadCsv(projectId: string, sheetName: string, file: File) {
+  return apiUpload<CsvUploadResult>(
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/upload`,
+    file,
   )
 }

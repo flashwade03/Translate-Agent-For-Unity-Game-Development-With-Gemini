@@ -318,6 +318,12 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
     return { ok: true, affectedSheets, affectedTranslations }
   }
 
+  // CSV Upload
+  params = match('/api/projects/:projectId/sheets/:sheetName/upload', path)
+  if (params && method === 'POST') {
+    return { addedKeys: 3, updatedKeys: 2, addedLanguages: [] }
+  }
+
   // Sheet-level Language Management
   params = match('/api/projects/:projectId/sheets/:sheetName/languages', path)
   if (params && method === 'POST') {

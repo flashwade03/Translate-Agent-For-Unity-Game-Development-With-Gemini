@@ -258,3 +258,9 @@ class AddRowPayload(_CamelModel):
 
 class DeleteRowsPayload(_CamelModel):
     keys: list[str]
+
+
+class CsvUploadResult(_CamelModel):
+    added_keys: int = 0
+    updated_keys: int = 0
+    added_languages: list[ProjectLanguage] = []

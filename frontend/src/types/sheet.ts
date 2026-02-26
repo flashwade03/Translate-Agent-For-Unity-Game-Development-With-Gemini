@@ -15,3 +15,9 @@ export interface Language {
   label: string
   isSource: boolean
 }
+
+export interface CsvUploadResult {
+  addedKeys: number
+  updatedKeys: number
+  addedLanguages: { code: string; label: string }[]
+}

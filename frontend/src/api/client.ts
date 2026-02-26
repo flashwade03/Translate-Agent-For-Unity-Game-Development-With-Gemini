@@ -26,3 +26,21 @@ export async function api<T>(
 
   return res.json()
 }
+
+export async function apiUpload<T>(path: string, file: File): Promise<T> {
+  if (USE_MOCK) {
+    const result = await mockFetch({ method: 'POST', path, body: { file } })
+    return result as T
+  }
+
+  const form = new FormData()
+  form.append('file', file)
+
+  const res = await fetch(path, { method: 'POST', body: form })
+
+  if (!res.ok) {
+    throw new Error(`Upload ${path} failed: ${res.status}`)
+  }
+
+  return res.json()
+}

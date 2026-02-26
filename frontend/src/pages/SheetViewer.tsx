@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSheetData, useAddRow, useDeleteRows } from '../hooks/useSheets'
 import { useTranslation } from '../hooks/useTranslation'
 import { useLanguages } from '../hooks/useLanguages'
 import { useSheetSettings, useUpdateSheetSettings } from '../hooks/useSheetSettings'
-import { updateSheetRows } from '../api/sheets'
+import { updateSheetRows, uploadCsv, exportCsvUrl } from '../api/sheets'
+import { QUERY_KEYS } from '../lib/constants'
+import type { CsvUploadResult } from '../types'
 import { PageHeader } from '../components/layout/PageHeader'
 import { DataTable } from '../components/DataTable'
 import { JobStatusBanner } from '../components/JobStatusBanner'
@@ -18,6 +20,7 @@ import { Spinner } from '../components/ui/Spinner'
 
 export default function SheetViewer() {
   const { projectId, sheetName } = useParams<{ projectId: string; sheetName: string }>()
+  const queryClient = useQueryClient()
   const { data, isLoading, error } = useSheetData(projectId!, sheetName!)
   const { job, isRunning, trigger, dismiss } = useTranslation(projectId!, sheetName!)
   const { addMutation, deleteMutation } = useLanguages(projectId!, sheetName!)
@@ -31,6 +34,25 @@ export default function SheetViewer() {
   const [deleteTarget, setDeleteTarget] = useState<{ code: string; label: string } | null>(null)
   const [deleteTranslationCount, setDeleteTranslationCount] = useState(0)
   const [pendingDeleteKeys, setPendingDeleteKeys] = useState<string[]>([])
+  const [uploadResult, setUploadResult] = useState<CsvUploadResult | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => uploadCsv(projectId!, sheetName!, file),
+    onSuccess: (result) => {
+      setUploadResult(result)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sheetData(projectId!, sheetName!) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectLanguages(projectId!) })
+    },
+  })
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      uploadMutation.mutate(file)
+      e.target.value = ''
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: (updates: { key: string; langCode: string; value: string }[]) =>
@@ -147,6 +169,23 @@ export default function SheetViewer() {
             <Button
               variant="outline"
               size="sm"
+              disabled={uploadMutation.isPending}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploadMutation.isPending ? 'Uploading...' : 'Upload CSV'}
+            </Button>
+            <a
+              href={exportCsvUrl(projectId!, sheetName!)}
+              download={`${sheetName}.csv`}
+              className="inline-flex"
+            >
+              <Button variant="outline" size="sm" type="button">
+                Export CSV
+              </Button>
+            </a>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setSettingsOpen(true)}
             >
               Settings
@@ -154,6 +193,43 @@ export default function SheetViewer() {
           </div>
         }
       />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {uploadResult && (
+        <div className="mb-4 flex items-center justify-between rounded-[var(--radius-md)] border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          <span>
+            Upload complete: {uploadResult.addedKeys} keys added, {uploadResult.updatedKeys} keys updated
+            {uploadResult.addedLanguages.length > 0 && (
+              <>, {uploadResult.addedLanguages.length} new language{uploadResult.addedLanguages.length > 1 ? 's' : ''} added</>
+            )}
+          </span>
+          <button
+            className="ml-4 text-green-600 hover:text-green-800"
+            onClick={() => setUploadResult(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {uploadMutation.isError && (
+        <div className="mb-4 flex items-center justify-between rounded-[var(--radius-md)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>Upload failed: {uploadMutation.error?.message ?? 'Unknown error'}</span>
+          <button
+            className="ml-4 text-red-600 hover:text-red-800"
+            onClick={() => uploadMutation.reset()}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {job && <JobStatusBanner job={job} onDismiss={dismiss} />}
 

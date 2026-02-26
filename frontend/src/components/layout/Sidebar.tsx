@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSheetNames, useSheetData, useCreateSheet, useDeleteSheet } from '../../hooks/useSheets'
+import { uploadCsv } from '../../api/sheets'
+import { QUERY_KEYS } from '../../lib/constants'
 import { cn } from '../../lib/utils'
 import { AddSheetDialog } from '../AddSheetDialog'
 import { DeleteSheetDialog } from '../DeleteSheetDialog'
@@ -8,9 +11,21 @@ import { DeleteSheetDialog } from '../DeleteSheetDialog'
 export function Sidebar() {
   const { projectId, sheetName } = useParams<{ projectId: string; sheetName: string }>()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: sheets } = useSheetNames(projectId!)
   const createSheet = useCreateSheet(projectId!)
   const deleteSheet = useDeleteSheet(projectId!)
+
+  const importSheet = useMutation({
+    mutationFn: ({ name, file }: { name: string; file: File }) =>
+      createSheet.mutateAsync(name).then(() => uploadCsv(projectId!, name, file)),
+    onSuccess: (_result, { name }) => {
+      setAddOpen(false)
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.sheetData(projectId!, name) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.projectLanguages(projectId!) })
+      navigate(`/projects/${projectId}/sheets/${encodeURIComponent(name)}`)
+    },
+  })
 
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -128,7 +143,8 @@ export function Sidebar() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         onAdd={handleCreate}
-        isPending={createSheet.isPending}
+        onImport={(name, file) => importSheet.mutate({ name, file })}
+        isPending={createSheet.isPending || importSheet.isPending}
       />
 
       {deleteTarget && (
