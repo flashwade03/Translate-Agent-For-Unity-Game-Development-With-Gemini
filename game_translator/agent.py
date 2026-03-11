@@ -2,8 +2,8 @@ import os
 
 from google.adk.agents import Agent
 
-from .sub_agents.translator import translator_agent
-from .sub_agents.reviewer import reviewer_agent
+from .sub_agents.translator import create_translator_agent
+from .sub_agents.reviewer import create_reviewer_agent
 from .tools.config import get_project_config, get_sheet_context
 from .tools.glossary import get_glossary, get_style_guide
 from .tools.sheets import read_sheet, write_sheet
@@ -25,7 +25,7 @@ def create_agent(source_type: str = "csv") -> Agent:
             get_style_guide,
             gws_read_sheet,              # Google Sheets 읽기 래퍼 도구
             save_pending_translations,    # 번역 결과 pending 저장
-            create_gws_skill_toolset(),   # SkillToolset (gws CLI 참조 지시사항)
+            create_gws_skill_toolset(),   # SkillToolset (gws 참조 지시사항)
         ]
         instruction = ORCHESTRATOR_INSTRUCTION_GWS
     else:
@@ -42,7 +42,7 @@ def create_agent(source_type: str = "csv") -> Agent:
         description="Game translation orchestrator.",
         instruction=instruction,
         tools=tools,
-        sub_agents=[translator_agent, reviewer_agent],
+        sub_agents=[create_translator_agent(), create_reviewer_agent()],
     )
 
 # ADK CLI 호환: 모듈 레벨 export 유지

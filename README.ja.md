@@ -90,7 +90,7 @@ msg_welcome,"Welcome, {0}!",ようこそ、{0}！,"환영합니다, {0}!"
 - Python 3.11+
 - Node.js 18+
 - [Google Gemini APIキー](https://aistudio.google.com/apikey)
-- （オプション）[Google Workspace CLI](https://www.npmjs.com/package/@anthropic-ai/gws) — Google Sheets連携用
+- （オプション）[Google Workspace CLI](https://www.npmjs.com/package/@googleworkspace/cli) — Google Sheets連携用
 
 ### 1. クローン＆インストール
 
@@ -123,7 +123,7 @@ FRONTEND_PORT=5173
 ローカルCSVの代わりにGoogle Sheetsをデータソースとして使用する場合：
 
 ```bash
-npm install -g @anthropic-ai/gws
+npm install -g @googleworkspace/cli
 gws auth login --scopes sheets
 ```
 

@@ -90,7 +90,7 @@ Placeholders like `{0}`, `{1}` are preserved across translations.
 - Python 3.11+
 - Node.js 18+
 - [Google Gemini API key](https://aistudio.google.com/apikey)
-- (Optional) [Google Workspace CLI](https://www.npmjs.com/package/@anthropic-ai/gws) — for Google Sheets integration
+- (Optional) [Google Workspace CLI](https://www.npmjs.com/package/@googleworkspace/cli) — for Google Sheets integration
 
 ### 1. Clone & Install
 
@@ -123,7 +123,7 @@ FRONTEND_PORT=5173
 If you want to use Google Sheets as a data source instead of local CSV:
 
 ```bash
-npm install -g @anthropic-ai/gws
+npm install -g @googleworkspace/cli
 gws auth login --scopes sheets
 ```
 

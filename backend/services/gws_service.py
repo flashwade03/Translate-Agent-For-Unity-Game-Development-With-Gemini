@@ -1,9 +1,7 @@
 import asyncio
 import json
 import logging
-import os
 import re
-import tempfile
 
 from backend.models import SheetData, Language
 
@@ -64,35 +62,42 @@ def _validate_tab_name(tab_name: str) -> None:
 
 
 class GwsService:
-    async def _run_gws(self, *args: str, stdin_data: str | None = None) -> dict:
+    async def _run_gws(
+        self, *args: str, params: dict | None = None, body: dict | None = None,
+    ) -> dict:
         """Run a gws CLI command and return parsed JSON output.
 
+        gws CLI v0.11+ uses --params for URL/query params and --json for request body.
         Raises GwsAuthError, GwsTimeoutError, GwsParseError, GwsError.
         """
         cmd = ["gws"] + list(args) + ["--format=json"]
+        if params:
+            cmd += ["--params", json.dumps(params, ensure_ascii=False)]
+        if body:
+            cmd += ["--json", json.dumps(body, ensure_ascii=False)]
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdin=asyncio.subprocess.PIPE if stdin_data else None,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=stdin_data.encode("utf-8") if stdin_data else None),
+                proc.communicate(),
                 timeout=GWS_TIMEOUT,
             )
         except asyncio.TimeoutError:
             raise GwsTimeoutError(f"gws command timed out after {GWS_TIMEOUT}s: {' '.join(cmd)}")
 
         stderr_text = stderr.decode("utf-8", errors="replace").strip()
+        stdout_text = stdout.decode("utf-8", errors="replace").strip()
 
         if proc.returncode != 0:
-            # Detect auth errors
-            if any(kw in stderr_text.lower() for kw in ["unauthorized", "token expired", "invalid_grant", "auth"]):
-                raise GwsAuthError(f"gws authentication error: {stderr_text}")
-            raise GwsError(f"gws command failed (exit {proc.returncode}): {stderr_text}")
+            # gws v0.11 outputs errors as JSON to stdout
+            error_text = stdout_text or stderr_text
+            if any(kw in error_text.lower() for kw in ["unauthorized", "token expired", "invalid_grant", "auth"]):
+                raise GwsAuthError(f"gws authentication error: {error_text}")
+            raise GwsError(f"gws command failed (exit {proc.returncode}): {error_text}")
 
-        stdout_text = stdout.decode("utf-8", errors="replace").strip()
         if not stdout_text:
             raise GwsParseError("gws returned empty output")
 
@@ -126,9 +131,8 @@ class GwsService:
         """List tab names in a spreadsheet."""
         _validate_spreadsheet_id(spreadsheet_id)
         result = await self._run_gws(
-            "sheets", "spreadsheets.get",
-            f"--spreadsheetId={spreadsheet_id}",
-            "--fields=sheets.properties.title",
+            "sheets", "spreadsheets", "get",
+            params={"spreadsheetId": spreadsheet_id, "fields": "sheets.properties.title"},
         )
         sheets = result.get("sheets", [])
         return [s["properties"]["title"] for s in sheets if "properties" in s]
@@ -138,9 +142,8 @@ class GwsService:
         _validate_spreadsheet_id(spreadsheet_id)
         _validate_tab_name(tab_name)
         result = await self._run_gws(
-            "sheets", "spreadsheets.values.get",
-            f"--spreadsheetId={spreadsheet_id}",
-            f"--range={tab_name}",
+            "sheets", "spreadsheets", "values", "get",
+            params={"spreadsheetId": spreadsheet_id, "range": tab_name},
         )
         values = result.get("values", [])
         if not values:
@@ -189,24 +192,15 @@ class GwsService:
             cell_ref = f"{tab_name}!{col_letter}{u['row_index'] + 2}"  # +2 for 1-indexed + header
             data.append({"range": cell_ref, "values": [[u["value"]]]})
 
-        payload = {
+        body = {
             "valueInputOption": "RAW",
             "data": data,
         }
 
-        # Write payload to temp file to avoid shell escaping issues
-        # with JSON special characters in subprocess args.
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", prefix="gws_batch_")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False)
-
-            result = await self._run_gws(
-                "sheets", "spreadsheets.values.batchUpdate",
-                f"--spreadsheetId={spreadsheet_id}",
-                f"--request.body=@{tmp_path}",
-            )
-        finally:
-            os.unlink(tmp_path)
+        result = await self._run_gws(
+            "sheets", "spreadsheets", "values", "batchUpdate",
+            params={"spreadsheetId": spreadsheet_id},
+            body=body,
+        )
 
         return result.get("totalUpdatedCells", len(updates))

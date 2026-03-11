@@ -27,12 +27,15 @@ def gws_read_sheet(spreadsheet_id: str, tab_name: str) -> dict:
     if not tab_name or not _TAB_NAME_RE.match(tab_name):
         return {"error": "Invalid tab name: contains forbidden characters or is too long"}
 
+    params = json.dumps({
+        "spreadsheetId": spreadsheet_id,
+        "range": tab_name,
+    })
     try:
         result = subprocess.run(
             [
-                "gws", "sheets", "spreadsheets.values.get",
-                f"--spreadsheetId={spreadsheet_id}",
-                f"--range={tab_name}",
+                "gws", "sheets", "spreadsheets", "values", "get",
+                "--params", params,
                 "--format=json",
             ],
             capture_output=True,
@@ -45,8 +48,8 @@ def gws_read_sheet(spreadsheet_id: str, tab_name: str) -> dict:
         return {"error": "gws CLI command timed out after 30 seconds"}
 
     if result.returncode != 0:
-        stderr = result.stderr.strip()
-        return {"error": f"gws CLI failed (exit {result.returncode}): {stderr}"}
+        error_text = result.stdout.strip() or result.stderr.strip()
+        return {"error": f"gws CLI failed (exit {result.returncode}): {error_text}"}
 
     try:
         data = json.loads(result.stdout)

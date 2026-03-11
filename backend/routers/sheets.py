@@ -10,15 +10,16 @@ from backend.services.project_service import ProjectService
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["sheets"])
 project_service = ProjectService()
 
-# Prevent path traversal: only allow safe characters in identifiers
-_SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9_\- .]+$")
+# Prevent path traversal: block /, \, .., and null bytes
+_SAFE_NAME_RE = re.compile(r"^[^/\\\x00]+$")
+_PATH_TRAVERSAL_RE = re.compile(r"\.\.")
 
 
 def _validate_names(project_id: str, sheet_name: str | None = None) -> None:
     """Validate project_id and sheet_name to prevent path traversal."""
-    if not _SAFE_NAME_RE.match(project_id):
+    if not _SAFE_NAME_RE.match(project_id) or _PATH_TRAVERSAL_RE.search(project_id):
         raise HTTPException(400, "Invalid project ID")
-    if sheet_name is not None and not _SAFE_NAME_RE.match(sheet_name):
+    if sheet_name is not None and (not _SAFE_NAME_RE.match(sheet_name) or _PATH_TRAVERSAL_RE.search(sheet_name)):
         raise HTTPException(400, "Invalid sheet name")
 
 
