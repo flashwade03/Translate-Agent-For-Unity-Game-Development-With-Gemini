@@ -1,5 +1,5 @@
 import { api, apiUpload } from './client'
-import type { SheetData, CsvUploadResult } from '../types'
+import type { SheetData, CsvUploadResult, PendingTranslationsResponse } from '../types'
 
 export function fetchSheetNames(projectId: string) {
   return api<string[]>('GET', `/api/projects/${projectId}/sheets`)
@@ -84,5 +84,33 @@ export function uploadCsv(projectId: string, sheetName: string, file: File) {
   return apiUpload<CsvUploadResult>(
     `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/upload`,
     file,
+  )
+}
+
+export function fetchPendingTranslations(projectId: string, sheetName: string) {
+  return api<PendingTranslationsResponse>(
+    'GET',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/pending`,
+  )
+}
+
+export function fetchPendingCount(projectId: string, sheetName: string) {
+  return api<{ count: number }>(
+    'GET',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/pending/count`,
+  )
+}
+
+export function applyTranslations(projectId: string, sheetName: string) {
+  return api<{ applied: number; skipped: number }>(
+    'POST',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/apply`,
+  )
+}
+
+export function discardPending(projectId: string, sheetName: string) {
+  return api<{ discarded: number }>(
+    'DELETE',
+    `/api/projects/${projectId}/sheets/${encodeURIComponent(sheetName)}/pending`,
   )
 }

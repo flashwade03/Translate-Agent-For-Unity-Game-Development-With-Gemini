@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { NavLink, useParams, useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSheetNames, useSheetData, useCreateSheet, useDeleteSheet } from '../../hooks/useSheets'
 import { uploadCsv } from '../../api/sheets'
+import { fetchProject } from '../../api/projects'
 import { QUERY_KEYS } from '../../lib/constants'
 import { cn } from '../../lib/utils'
 import { AddSheetDialog } from '../AddSheetDialog'
@@ -15,6 +16,14 @@ export function Sidebar() {
   const { data: sheets } = useSheetNames(projectId!)
   const createSheet = useCreateSheet(projectId!)
   const deleteSheet = useDeleteSheet(projectId!)
+
+  // Detect project sourceType
+  const { data: project } = useQuery({
+    queryKey: QUERY_KEYS.project(projectId!),
+    queryFn: () => fetchProject(projectId!),
+    enabled: !!projectId,
+  })
+  const isGws = project?.sourceType === 'gws'
 
   const importSheet = useMutation({
     mutationFn: ({ name, file }: { name: string; file: File }) =>
@@ -76,7 +85,14 @@ export function Sidebar() {
         <NavLink to="/" className="text-xs text-text-muted hover:text-text">
           &larr; All Projects
         </NavLink>
-        <h2 className="font-semibold mt-1 text-sm truncate">{projectId}</h2>
+        <div className="flex items-center gap-2 mt-1">
+          <h2 className="font-semibold text-sm truncate">{projectId}</h2>
+          {isGws && (
+            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-50 text-blue-600">
+              Sheets
+            </span>
+          )}
+        </div>
       </div>
 
       <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto">
@@ -84,16 +100,19 @@ export function Sidebar() {
           <span className="text-xs font-medium text-text-muted uppercase tracking-wide">
             Sheets
           </span>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="text-text-muted hover:text-accent transition-colors"
-            title="Add sheet"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
+          {/* Hide add sheet button for gws projects */}
+          {!isGws && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="text-text-muted hover:text-accent transition-colors"
+              title="Add sheet"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          )}
         </div>
         {sheets?.map((name) => (
           <NavLink
@@ -102,20 +121,23 @@ export function Sidebar() {
             className={linkClass}
           >
             <span className="truncate">{name}</span>
-            <button
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setDeleteTarget(name)
-              }}
-              className="hidden group-hover:block text-text-muted hover:text-red-500 transition-colors shrink-0 ml-1"
-              title={`Delete ${name}`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            {/* Hide delete button for gws projects */}
+            {!isGws && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setDeleteTarget(name)
+                }}
+                className="hidden group-hover:block text-text-muted hover:text-red-500 transition-colors shrink-0 ml-1"
+                title={`Delete ${name}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </NavLink>
         ))}
 
@@ -139,15 +161,17 @@ export function Sidebar() {
         </NavLink>
       </nav>
 
-      <AddSheetDialog
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onAdd={handleCreate}
-        onImport={(name, file) => importSheet.mutate({ name, file })}
-        isPending={createSheet.isPending || importSheet.isPending}
-      />
+      {!isGws && (
+        <AddSheetDialog
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onAdd={handleCreate}
+          onImport={(name, file) => importSheet.mutate({ name, file })}
+          isPending={createSheet.isPending || importSheet.isPending}
+        />
+      )}
 
-      {deleteTarget && (
+      {!isGws && deleteTarget && (
         <DeleteSheetDialog
           open={!!deleteTarget}
           sheetName={deleteTarget}

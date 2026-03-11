@@ -26,3 +26,19 @@ export interface JobHistoryEntry {
   createdAt: string
   completedAt?: string
 }
+
+export interface PendingTranslation {
+  id: number
+  projectId: string
+  sheetName: string
+  key: string
+  langCode: string
+  value: string
+  source: 'agent' | 'user_edit'
+  createdAt: string
+}
+
+export interface PendingTranslationsResponse {
+  items: PendingTranslation[]
+  count: number
+}

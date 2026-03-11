@@ -21,7 +21,12 @@ async def get_project(project_id: str):
 
 @router.post("", response_model=Project, status_code=201)
 async def create_project(payload: CreateProjectPayload):
-    return service.create_project(payload.name, payload.description)
+    return service.create_project(
+        payload.name,
+        payload.description,
+        source_type=payload.source_type.value,
+        spreadsheet_id=payload.spreadsheet_id,
+    )
 
 
 @router.delete("/{project_id}")

@@ -10,6 +10,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project }: ProjectCardProps) {
   const navigate = useNavigate()
+  const isGws = project.sourceType === 'gws'
 
   return (
     <Card
@@ -18,7 +19,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
     >
       <div className="flex items-start justify-between mb-2">
         <h3 className="font-semibold text-base">{project.name}</h3>
-        <Badge variant="info">{project.sheetCount} sheets</Badge>
+        <div className="flex items-center gap-1.5">
+          {isGws ? (
+            <Badge variant="info">Sheets</Badge>
+          ) : (
+            <Badge variant="default">CSV</Badge>
+          )}
+          <Badge variant="info">{project.sheetCount} sheets</Badge>
+        </div>
       </div>
       <p className="text-sm text-text-muted mb-4 line-clamp-2">
         {project.description}

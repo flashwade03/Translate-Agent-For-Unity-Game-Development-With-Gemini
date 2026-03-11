@@ -33,7 +33,7 @@ def read_sheet(project_id: str, sheet_name: str) -> dict:
     # Parse language headers: "English(en)" -> {code, label}
     languages = []
     for h in headers[1:]:
-        m = re.match(r"(.+)\((\w+)\)", h)
+        m = re.match(r"(.+)\(([^)]+)\)", h)
         if m:
             languages.append({"code": m.group(2), "label": m.group(1)})
 
@@ -79,7 +79,7 @@ def write_sheet(project_id: str, sheet_name: str, updates: list[dict]) -> dict:
     # Build column index: lang_code -> column index
     col_index: dict[str, int] = {}
     for i, h in enumerate(headers[1:], start=1):
-        m = re.match(r".+\((\w+)\)", h)
+        m = re.match(r".+\(([^)]+)\)", h)
         if m:
             col_index[m.group(1)] = i
 

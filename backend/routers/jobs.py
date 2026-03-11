@@ -7,6 +7,8 @@ from backend.routers.ws import broadcast_job_update
 router = APIRouter(tags=["jobs"])
 logger = logging.getLogger("agent_job")
 
+WRITE_TOOL_NAMES = {"write_sheet", "save_pending_translations"}
+
 
 @router.post("/api/projects/{project_id}/sheets/{sheet_name}/jobs", response_model=TranslationJob, status_code=201)
 async def create_job(
@@ -17,13 +19,25 @@ async def create_job(
     request: Request,
 ):
     job_svc = request.app.state.job_service
-    sheets_svc = request.app.state.sheets_service
+    config_svc = request.app.state.config_service
+    cfg = config_svc._read_config(project_id)
+    source = cfg.get("source", "csv")
 
-    # Count keys from the CSV for progress tracking
     total_keys = 0
-    sheet_data = sheets_svc.get_sheet_data(project_id, sheet_name)
-    if sheet_data:
-        total_keys = len(sheet_data.rows)
+    if source == "gws":
+        spreadsheet_id = cfg.get("spreadsheet_id")
+        if spreadsheet_id:
+            try:
+                gws_svc = request.app.state.gws_service
+                sheet_data = await gws_svc.read_tab(spreadsheet_id, sheet_name)
+                total_keys = len(sheet_data.rows)
+            except Exception:
+                pass  # Will be 0; agent will determine actual count
+    else:
+        sheets_svc = request.app.state.sheets_service
+        sheet_data = sheets_svc.get_sheet_data(project_id, sheet_name)
+        if sheet_data:
+            total_keys = len(sheet_data.rows)
 
     job = job_svc.create_job(project_id, sheet_name, payload.type.value, total_keys=total_keys)
 
@@ -52,7 +66,7 @@ async def get_review_report(project_id: str, sheet_name: str, request: Request):
 
 
 async def _run_agent_turn(runner, session_id, user_id, message):
-    """Run one agent turn and return (response_text, wrote_sheet, event_count)."""
+    """Run one agent turn and return (response_text, called_write_tool, event_count)."""
     from google.genai import types
 
     content = types.Content(
@@ -61,7 +75,7 @@ async def _run_agent_turn(runner, session_id, user_id, message):
     )
 
     response_text = ""
-    wrote_sheet = False
+    called_write_tool = False
     event_count = 0
 
     async for event in runner.run_async(
@@ -73,12 +87,12 @@ async def _run_agent_turn(runner, session_id, user_id, message):
         if getattr(event, "content", None) and event.content.parts:
             for part in event.content.parts:
                 if hasattr(part, "function_call") and part.function_call:
-                    if part.function_call.name == "write_sheet":
-                        wrote_sheet = True
+                    if part.function_call.name in WRITE_TOOL_NAMES:
+                        called_write_tool = True
                 elif hasattr(part, "text") and part.text:
                     response_text += part.text
 
-    return response_text, wrote_sheet, event_count
+    return response_text, called_write_tool, event_count
 
 
 async def run_agent_job(app, job_id: str):
@@ -98,12 +112,30 @@ async def run_agent_job(app, job_id: str):
         "error": None,
     })
 
-    try:
-        runner = app.state.runner
-        session_service = app.state.session_service
+    # Determine source type
+    config_svc = app.state.config_service
+    cfg = config_svc._read_config(job.project_id)
+    source_type = cfg.get("source", "csv")
 
-        if not runner or not session_service:
-            raise RuntimeError("ADK Runner not initialized")
+    try:
+        session_service = app.state.session_service
+        if not session_service:
+            raise RuntimeError("ADK SessionService not initialized")
+
+        # Create appropriate runner based on source type
+        if source_type == "gws":
+            from game_translator.agent import create_agent
+            from google.adk.runners import Runner
+            gws_agent = create_agent("gws")
+            runner = Runner(
+                agent=gws_agent,
+                session_service=session_service,
+                app_name="game_translator",
+            )
+        else:
+            runner = app.state.runner
+            if not runner:
+                raise RuntimeError("ADK Runner not initialized")
 
         # Create a new session for this job
         session = await session_service.create_session(
@@ -111,15 +143,42 @@ async def run_agent_job(app, job_id: str):
             user_id=job.project_id,
         )
 
-        # Build the user message based on job type
-        if job.type.value == "translate_all":
-            user_msg = f"Translate the {job.sheet_name} sheet for the {job.project_id} project. Translate all keys to all target languages. You MUST call write_sheet to save results."
-        elif job.type.value == "update":
-            user_msg = f"Update translations for the {job.sheet_name} sheet in the {job.project_id} project. You MUST call write_sheet to save results."
-        elif job.type.value == "review":
-            user_msg = f"Review the translations in the {job.sheet_name} sheet for the {job.project_id} project. Return a JSON report with issues."
+        # Build the user message based on job type and source type
+        if source_type == "gws":
+            spreadsheet_id = cfg.get("spreadsheet_id", "")
+            if job.type.value == "translate_all":
+                user_msg = (
+                    f"Translate the '{job.sheet_name}' tab in Google Sheets "
+                    f"(spreadsheet ID: {spreadsheet_id}) for the '{job.project_id}' project. "
+                    f"Translate all keys to all target languages. "
+                    f"You MUST call save_pending_translations to save results."
+                )
+            elif job.type.value == "update":
+                user_msg = (
+                    f"Update translations for the '{job.sheet_name}' tab in Google Sheets "
+                    f"(spreadsheet ID: {spreadsheet_id}) for the '{job.project_id}' project. "
+                    f"You MUST call save_pending_translations to save results."
+                )
+            elif job.type.value == "review":
+                user_msg = (
+                    f"Review the translations in the '{job.sheet_name}' tab in Google Sheets "
+                    f"(spreadsheet ID: {spreadsheet_id}) for the '{job.project_id}' project. "
+                    f"Return a JSON report with issues."
+                )
+            else:
+                user_msg = (
+                    f"Process the '{job.sheet_name}' tab in Google Sheets "
+                    f"(spreadsheet ID: {spreadsheet_id}) for the '{job.project_id}' project."
+                )
         else:
-            user_msg = f"Process the {job.sheet_name} sheet for the {job.project_id} project."
+            if job.type.value == "translate_all":
+                user_msg = f"Translate the {job.sheet_name} sheet for the {job.project_id} project. Translate all keys to all target languages. You MUST call write_sheet to save results."
+            elif job.type.value == "update":
+                user_msg = f"Update translations for the {job.sheet_name} sheet in the {job.project_id} project. You MUST call write_sheet to save results."
+            elif job.type.value == "review":
+                user_msg = f"Review the translations in the {job.sheet_name} sheet for the {job.project_id} project. Return a JSON report with issues."
+            else:
+                user_msg = f"Process the {job.sheet_name} sheet for the {job.project_id} project."
 
         logger.info("Starting job %s: %s", job_id, user_msg)
         job_svc.update_job(job_id, progress=30)
@@ -133,14 +192,14 @@ async def run_agent_job(app, job_id: str):
         })
 
         # Turn 1: Agent reads context, generates translations, and writes
-        response_text, wrote_sheet, events = await _run_agent_turn(
+        response_text, called_write_tool, events = await _run_agent_turn(
             runner, session.id, job.project_id, user_msg,
         )
-        logger.info("Job %s turn1: events=%d wrote_sheet=%s", job_id, events, wrote_sheet)
+        logger.info("Job %s turn1: events=%d called_write_tool=%s", job_id, events, called_write_tool)
 
-        # Turn 2: If agent didn't call write_sheet, nudge it
-        if not wrote_sheet and job.type.value in ("translate_all", "update"):
-            logger.info("Job %s: write_sheet not called, sending follow-up", job_id)
+        # Turn 2: If agent didn't call a write tool, nudge it
+        if not called_write_tool and job.type.value in ("translate_all", "update"):
+            logger.info("Job %s: write tool not called, sending follow-up", job_id)
             job_svc.update_job(job_id, progress=60)
             await broadcast_job_update(job_id, {
                 "jobId": job_id,
@@ -151,15 +210,22 @@ async def run_agent_job(app, job_id: str):
                 "error": None,
             })
 
-            followup = (
-                "You have the translations ready. Now call "
-                "write_sheet(project_id, sheet_name, updates) to save them to the CSV file. "
-                "Each update needs 'key', 'lang_code', and 'value'."
-            )
-            response_text2, wrote_sheet2, events2 = await _run_agent_turn(
+            if source_type == "gws":
+                followup = (
+                    "You have the translations ready. Now call "
+                    "save_pending_translations(project_id, sheet_name, translations) "
+                    "to save them for user review. Each translation needs 'key', 'lang_code', 'value'."
+                )
+            else:
+                followup = (
+                    "You have the translations ready. Now call "
+                    "write_sheet(project_id, sheet_name, updates) to save them to the CSV file. "
+                    "Each update needs 'key', 'lang_code', and 'value'."
+                )
+            response_text2, called_write_tool2, events2 = await _run_agent_turn(
                 runner, session.id, job.project_id, followup,
             )
-            logger.info("Job %s turn2: events=%d wrote_sheet=%s", job_id, events2, wrote_sheet2)
+            logger.info("Job %s turn2: events=%d called_write_tool=%s", job_id, events2, called_write_tool2)
             response_text += response_text2
 
         job_svc.update_job(job_id, status=JobStatus.completed, progress=100, processed_keys=job.total_keys)

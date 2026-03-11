@@ -13,4 +13,9 @@ export const QUERY_KEYS = {
     ['review', projectId, sheetName] as const,
   jobHistory: (projectId: string) => ['jobHistory', projectId] as const,
   projectLanguages: (projectId: string) => ['projectLanguages', projectId] as const,
+  pendingTranslations: (projectId: string, sheetName: string) =>
+    ['pendingTranslations', projectId, sheetName] as const,
+  pendingCount: (projectId: string, sheetName: string) =>
+    ['pendingCount', projectId, sheetName] as const,
+  gwsAuthStatus: ['gwsAuthStatus'] as const,
 } as const

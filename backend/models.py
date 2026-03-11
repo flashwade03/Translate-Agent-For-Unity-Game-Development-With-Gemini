@@ -30,6 +30,11 @@ class _CamelModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SourceType(str, Enum):
+    csv = "csv"
+    gws = "gws"
+
+
 class JobStatus(str, Enum):
     pending = "pending"
     running = "running"
@@ -67,6 +72,8 @@ class Project(_CamelModel):
     id: str
     name: str
     description: str
+    source_type: SourceType = SourceType.csv
+    spreadsheet_id: str | None = None
     sheet_count: int = 0
     last_translated_at: str | None = None
     created_at: str
@@ -75,6 +82,8 @@ class Project(_CamelModel):
 class CreateProjectPayload(_CamelModel):
     name: str
     description: str
+    source_type: SourceType = SourceType.csv
+    spreadsheet_id: str | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,10 @@ interface DataTableProps {
   data: SheetData
   disabled?: boolean
   visibleLanguages?: string[] | null
+  pendingCells?: Record<string, Record<string, string>>
+  baseRows?: Record<string, Record<string, string>>
+  hideCheckboxes?: boolean
+  hideAddRow?: boolean
   onCellSave: (key: string, langCode: string, value: string) => void
   onDeleteLanguage?: (code: string) => void
   onAddLanguage?: () => void
@@ -14,13 +18,29 @@ interface DataTableProps {
   onToggleVisibility?: (code: string) => void
 }
 
-export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDeleteLanguage, onAddLanguage, onAddRow, onDeleteRows, onToggleVisibility }: DataTableProps) {
+export function DataTable({
+  data,
+  disabled,
+  visibleLanguages,
+  pendingCells,
+  baseRows,
+  hideCheckboxes,
+  hideAddRow,
+  onCellSave,
+  onDeleteLanguage,
+  onAddLanguage,
+  onAddRow,
+  onDeleteRows,
+  onToggleVisibility,
+}: DataTableProps) {
   const { languages, rows } = data
 
   const isVisible = (code: string) => !visibleLanguages || visibleLanguages.includes(code)
-  const displayedLanguages = languages.filter((l) => isVisible(l.code))
   const [newKey, setNewKey] = useState('')
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+
+  const showCheckboxes = !hideCheckboxes
+  const showAddRow = !hideAddRow && onAddRow
 
   const toggleSelect = (key: string) => {
     setSelectedKeys((prev) => {
@@ -46,9 +66,15 @@ export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDele
     setNewKey('')
   }
 
+  const isPending = (key: string, langCode: string) =>
+    !!pendingCells && !!pendingCells[key] && langCode in pendingCells[key]
+
+  const getBaseValue = (key: string, langCode: string) =>
+    baseRows?.[key]?.[langCode] ?? ''
+
   return (
     <div>
-      {selectedKeys.size > 0 && onDeleteRows && (
+      {showCheckboxes && selectedKeys.size > 0 && onDeleteRows && (
         <div className="flex items-center gap-2 mb-2">
           <button
             onClick={() => {
@@ -66,15 +92,17 @@ export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDele
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-bg-muted">
-              <th className="px-3 py-2 w-11">
-                <input
-                  type="checkbox"
-                  checked={rows.length > 0 && selectedKeys.size === rows.length}
-                  onChange={toggleSelectAll}
-                  disabled={disabled}
-                  className="accent-accent"
-                />
-              </th>
+              {showCheckboxes && (
+                <th className="px-3 py-2 w-11">
+                  <input
+                    type="checkbox"
+                    checked={rows.length > 0 && selectedKeys.size === rows.length}
+                    onChange={toggleSelectAll}
+                    disabled={disabled}
+                    className="accent-accent"
+                  />
+                </th>
+              )}
               <th className="text-left px-3 py-2 font-medium text-text-muted w-48 sticky left-0 bg-bg-muted">
                 Key
               </th>
@@ -146,15 +174,17 @@ export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDele
                 key={row.key}
                 className={`border-b border-border last:border-b-0 ${selectedKeys.has(row.key) ? 'bg-accent/5' : 'hover:bg-bg-muted/50'}`}
               >
-                <td className="px-3 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={selectedKeys.has(row.key)}
-                    onChange={() => toggleSelect(row.key)}
-                    disabled={disabled}
-                    className="accent-accent"
-                  />
-                </td>
+                {showCheckboxes && (
+                  <td className="px-3 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={selectedKeys.has(row.key)}
+                      onChange={() => toggleSelect(row.key)}
+                      disabled={disabled}
+                      className="accent-accent"
+                    />
+                  </td>
+                )}
                 <td className="px-3 py-1.5 font-mono text-xs text-text-muted sticky left-0 bg-white">
                   {row.key}
                 </td>
@@ -162,23 +192,51 @@ export function DataTable({ data, disabled, visibleLanguages, onCellSave, onDele
                   const visible = isVisible(lang.code)
                   if (!visible && !onToggleVisibility) return null
                   if (!visible) return <td key={lang.code} />
+
+                  const cellIsPending = isPending(row.key, lang.code)
+                  const baseVal = getBaseValue(row.key, lang.code)
+                  const isNew = cellIsPending && !baseVal
+
                   return (
-                    <td key={lang.code} className="px-1 py-0.5">
-                      <EditableCell
-                        value={row[lang.code] ?? ''}
-                        isEmpty={!row[lang.code]}
-                        disabled={disabled}
-                        onSave={(val) => onCellSave(row.key, lang.code, val)}
-                      />
+                    <td
+                      key={lang.code}
+                      className={`px-1 py-0.5 ${
+                        cellIsPending
+                          ? isNew
+                            ? 'bg-green-50 border-l-2 border-green-300'
+                            : 'bg-amber-50 border-l-2 border-amber-300'
+                          : ''
+                      }`}
+                    >
+                      {cellIsPending && !isNew && baseVal !== row[lang.code] && (
+                        <div className="px-2 text-xs text-text-muted line-through truncate" title={baseVal}>
+                          {baseVal}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <EditableCell
+                          value={row[lang.code] ?? ''}
+                          isEmpty={!row[lang.code]}
+                          disabled={disabled}
+                          onSave={(val) => onCellSave(row.key, lang.code, val)}
+                        />
+                        {cellIsPending && isNew && (
+                          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-green-100 text-green-700">
+                            NEW
+                          </span>
+                        )}
+                      </div>
                     </td>
                   )
                 })}
                 {onAddLanguage && <td />}
               </tr>
             ))}
-            {onAddRow && (
+            {showAddRow && (
               <tr className="border-b border-border last:border-b-0">
-                <td className="px-3 py-1.5">{/* empty checkbox cell */}</td>
+                {showCheckboxes && (
+                  <td className="px-3 py-1.5">{/* empty checkbox cell */}</td>
+                )}
                 <td className="px-3 py-1.5 sticky left-0 bg-white">
                   <form
                     onSubmit={(e) => {

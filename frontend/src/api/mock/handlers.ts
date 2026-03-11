@@ -65,6 +65,8 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
       id: payload.name.toLowerCase().replace(/\s+/g, '_'),
       name: payload.name,
       description: payload.description,
+      sourceType: payload.sourceType || 'csv',
+      spreadsheetId: payload.spreadsheetId || null,
       sheetCount: 0,
       lastTranslatedAt: null,
       createdAt: new Date().toISOString(),
@@ -361,6 +363,32 @@ export async function mockFetch(req: MockRequest): Promise<unknown> {
       }
     }
     return { ok: true, deletedTranslations }
+  }
+
+  // GWS Auth Status
+  if (method === 'GET' && path === '/api/gws/auth-status') {
+    return { authenticated: true, cliInstalled: true }
+  }
+
+  // Pending Translations
+  params = match('/api/projects/:projectId/sheets/:sheetName/pending', path)
+  if (params && method === 'GET') {
+    return { items: [], count: 0 }
+  }
+  if (params && method === 'DELETE') {
+    return { discarded: 0 }
+  }
+
+  // Pending Count
+  params = match('/api/projects/:projectId/sheets/:sheetName/pending/count', path)
+  if (params && method === 'GET') {
+    return { count: 0 }
+  }
+
+  // Apply Translations
+  params = match('/api/projects/:projectId/sheets/:sheetName/apply', path)
+  if (params && method === 'POST') {
+    return { applied: 0, skipped: 0 }
   }
 
   console.warn(`[Mock] Unhandled: ${method} ${path}`)
