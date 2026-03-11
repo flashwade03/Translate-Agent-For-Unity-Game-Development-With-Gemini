@@ -14,7 +14,7 @@
 
 AI-powered multi-agent game localization system. Translate, review, and manage game text across languages — all from a single dashboard.
 
-Built on **Google ADK (Gemini)** with a 3-agent architecture that handles translation, review, and orchestration. Stores everything as local CSV files compatible with **Unity Localization** format.
+Built on **Google ADK (Gemini)** with a 3-agent architecture that handles translation, review, and orchestration. Supports both **local CSV files** (Unity Localization format) and **Google Sheets** via the Google Workspace CLI.
 
 ---
 
@@ -42,6 +42,12 @@ Built on **Google ADK (Gemini)** with a 3-agent architecture that handles transl
 - Style guide editor (tone, formality, audience, rules)
 - Review reports with issue categorization and filtering
 
+**Google Sheets Integration**
+- Connect projects directly to Google Sheets spreadsheets
+- Translate in the agent, review changes in the dashboard, then apply to Sheets
+- Pending translations stored locally (SQLite) until explicitly applied
+- Full read support — tabs, rows, and languages auto-detected from sheet headers
+
 **Async Job System**
 - Non-blocking translation/review/update jobs
 - Real-time progress via WebSocket
@@ -58,10 +64,11 @@ Built on **Google ADK (Gemini)** with a 3-agent architecture that handles transl
 └─────────────────┘     └────────┬────────┘     └──────────────────┘
                                  │                 ├─ Orchestrator
                                  ▼                 ├─ Translator
-                          ┌──────────────┐         └─ Reviewer
-                          │  Local CSV   │
-                          │  (Unity fmt) │
-                          └──────────────┘
+                    ┌──────────────────────┐       └─ Reviewer
+                    │  Local CSV (Unity)   │
+                    │  — or —              │
+                    │  Google Sheets (gws) │
+                    └──────────────────────┘
 ```
 
 ### CSV Format (Unity Localization)
@@ -83,6 +90,7 @@ Placeholders like `{0}`, `{1}` are preserved across translations.
 - Python 3.11+
 - Node.js 18+
 - [Google Gemini API key](https://aistudio.google.com/apikey)
+- (Optional) [Google Workspace CLI](https://www.npmjs.com/package/@anthropic-ai/gws) — for Google Sheets integration
 
 ### 1. Clone & Install
 
@@ -110,7 +118,16 @@ BACKEND_PORT=8000
 FRONTEND_PORT=5173
 ```
 
-### 3. Run
+### 3. (Optional) Google Sheets Setup
+
+If you want to use Google Sheets as a data source instead of local CSV:
+
+```bash
+npm install -g @anthropic-ai/gws
+gws auth login --scopes sheets
+```
+
+### 4. Run
 
 ```bash
 # Terminal 1 — Backend
@@ -152,13 +169,14 @@ adk run game_translator   # Interactive agent session
 
 ```
 ├── game_translator/           # ADK agent package
-│   ├── agent.py               #   Root orchestrator
+│   ├── agent.py               #   Root orchestrator + agent factory
 │   ├── prompts.py             #   Agent instructions
 │   ├── sub_agents/            #   Translator & Reviewer
-│   └── tools/                 #   CSV read/write, config, glossary
+│   ├── tools/                 #   CSV read/write, gws read, pending, config, glossary
+│   └── skills/                #   ADK skill definitions (gws_sheets)
 ├── backend/                   # FastAPI server
-│   ├── routers/               #   API routes (sheets, jobs, config...)
-│   └── services/              #   Business logic
+│   ├── routers/               #   API routes (sheets, jobs, translations, gws...)
+│   └── services/              #   Business logic (gws_service, pending_translations...)
 ├── frontend/                  # React + TypeScript
 │   ├── src/pages/             #   7 page components
 │   ├── src/components/        #   20+ UI components
@@ -184,7 +202,7 @@ adk run game_translator   # Interactive agent session
 | AI | Google ADK, Gemini |
 | Backend | Python 3.11+, FastAPI, PyYAML |
 | Frontend | React 19, TypeScript, Vite, TanStack Query, Tailwind CSS |
-| Storage | Local CSV + YAML (no database required) |
+| Storage | Local CSV + YAML, Google Sheets (via gws CLI), SQLite (jobs/pending) |
 | CLI | Click |
 
 ---
